@@ -108,7 +108,7 @@ static const OffsetDef kBuild852_0[] = {
     { "RenderView", "client.dll", 0x181120, "81 EC BC 01 00 00 53 55 8B E9 6A 00 8D 8D ? ? ? ? E8", 0 },  // RTTI CViewRender[6]; el [3] es Shutdown()
     { "g_pClientMode", "client.dll", 0, "", 2 },  // TODO Fase E
     { "CalcViewModelView", "client.dll", 0, "", 0 },  // TODO Fase E
-    { "CreateMove", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "CreateMove", "client.dll", 0x95940, "6A FF E8 ? ? ? ? 83 C4 04 85 C0 75 ? B0 01 C2 08 00 8B 4C 24 08", 0 },  // ClientModeShared::CreateMove, RTTI ClientModePortalNormal[23]
     { "WriteUsercmd", "client.dll", 0, "", 0 },  // TODO Fase E
     { "g_pppInput", "client.dll", 0, "", 2 },  // TODO Fase E
     { "PrePushRenderTarget", "client.dll", 0, "", 0 },  // TODO Fase E
