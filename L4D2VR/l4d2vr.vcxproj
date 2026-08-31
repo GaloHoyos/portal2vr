@@ -11,6 +11,14 @@
     </ProjectConfiguration>
 
   </ItemGroup>
+  <!-- A donde copia el post-build el d3d9.dll ya compilado. Se puede apuntar a
+       cualquier build sin tocar el proyecto:
+         msbuild ... /p:P2VRDeployDir="C:\...\Leaks Valve\corehub wowwww\bin"
+       Un solo binario sirve para todos los builds: el perfil se elige en runtime
+       leyendo la fecha de "Exe build:" de engine.dll (ver buildprofile.cpp). -->
+  <PropertyGroup>
+    <P2VRDeployDir Condition="'$(P2VRDeployDir)'==''">C:\Users\galoh\OneDrive\Documents\Leaks Valve\852_6\bin</P2VRDeployDir>
+  </PropertyGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
@@ -85,7 +93,7 @@
       <ModuleDefinitionFile>$(SolutionDir)dxvk\src\d3d9\d3d9.def</ModuleDefinitionFile>
     </Link>
     <PostBuildEvent>
-      <Command>copy /Y "$(OutDir)$(TargetName)$(TargetExt)" "C:\Users\galoh\OneDrive\Documents\Leaks Valve\852_6\bin\$(TargetName)$(TargetExt)"</Command>
+      <Command>copy /Y "$(OutDir)$(TargetName)$(TargetExt)" "$(P2VRDeployDir)\$(TargetName)$(TargetExt)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -113,7 +121,7 @@
       <AdditionalDependencies>openvr_api.lib;$(SolutionDir)dxvk\lib32\vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy /Y "$(OutDir)$(TargetName)$(TargetExt)" "C:\Users\galoh\OneDrive\Documents\Leaks Valve\852_6\bin\$(TargetName)$(TargetExt)"</Command>
+      <Command>copy /Y "$(OutDir)$(TargetName)$(TargetExt)" "$(P2VRDeployDir)\$(TargetName)$(TargetExt)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
 
