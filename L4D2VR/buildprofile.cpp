@@ -98,11 +98,198 @@ static const OffsetDef kBuild852_6[] = {
     { "GetOwner", "server.dll", 0, "8B 81 ? ? ? ? 83 F8 FF 74 23 8B 15 ? ? ? ?", 0 },  // firma de retail sirve sin cambios
 };
 
+// Build corehub / 852_0 - Portal 2 dev, Exe build: Jul 28 2009
+//   El mas lejano de retail de todos los builds filtrados: 21 meses de drift.
+//   Ninguna firma de 852_6 sirve aca, hay que derivarlas de cero.
+static const OffsetDef kBuild852_0[] = {
+    { "GetFullScreenTexture", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "RenderView", "client.dll", 0x165270, "56 8B F1 6A 00 8D 8E ? ? ? ? E8 ? ? ? ? 6A 00 8D 8E ? ? ? ? E8 ? ? ? ?", 0 },  // RTTI CViewRender[3]; el patron corto matchea 2 veces
+    { "g_pClientMode", "client.dll", 0, "", 2 },  // TODO Fase E
+    { "CalcViewModelView", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "CreateMove", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "WriteUsercmd", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "g_pppInput", "client.dll", 0, "", 2 },  // TODO Fase E
+    { "PrePushRenderTarget", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "ReadUserCmd", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "ProcessUsercmds", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "CBaseEntity_entindex", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "EyePosition", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "PushRenderTargetAndViewport", "materialsystem.dll", 0x27DF0, "83 EC 24 8B 44 24 ? 8B 54 24 ? 89 04 24 33 C0 56 8B F1", 0 },  // CMatRenderContext[104], el overload de 6 args
+    { "PopRenderTargetAndViewport", "materialsystem.dll", 0x276F0, "56 8B F1 83 7E 50 00 74 ? 8B 06 8B 50 10", 0 },  // CMatRenderContext[108]; retail usa +0x4C, aca +0x50
+    { "TraceFirePortalServer", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "CWeaponPortalgun_FirePortal", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "VGui_Paint", "engine.dll", 0, "", 0 },  // TODO Fase E
+    { "PlayerPortalled", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "DrawSelf", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "ClipTransform", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "VGui_GetClientDLLRootPanel", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "g_pFullscreenRootPanel", "client.dll", 0, "", 2 },  // TODO Fase E
+    { "CreatePingPointer", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "GetPortalPlayer", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "PrecacheParticleSystem", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "Precache", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "SetControlPoint", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "SetDrawOnlyForSplitScreenUser", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "StopEmission", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "CHudCrosshair_ShouldDraw", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "UTIL_Portal_FirstAlongRay", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "UTIL_IntersectRayWithPortal", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "UTIL_Portal_AngleTransform", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "Weapon_ShootPosition", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "ComputeError", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "UpdateObject", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "UpdateObjectVM", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "RotateObject", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "EyeAngles", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "MatrixBuildPerspectiveX", "engine.dll", 0, "", 0 },  // TODO Fase E
+    { "GetFOV", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "GetDefaultFOV", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "GetViewModelFOV", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "GetOwner", "server.dll", 0, "", 0 },  // TODO Fase E
+};
+
+// --- Capas ABI por build -----------------------------------------------------
+//
+// Los indices se derivaron con tools/vrport (vtable por RTTI) mas Ghidra
+// (prototipos decompilados). Cada uno se verifico por separado: el corrimiento
+// contra retail no es uniforme dentro de una misma vtable.
+
+static constexpr AbiLayout AbiRetail2011()
+{
+    AbiLayout a{};
+    // Todos los indices quedan en kAbiCxx: las declaraciones de sdk/material.h
+    // y sdk/sdk.h son justamente las de retail, asi que las pone el compilador.
+    // Lo unico que hace falta explicito es el offset de struct.
+    a.msIsGameRunning = 0x2BB0;   // = offsetof(CMaterialSystem, isGameRunning)
+    return a;
+}
+
+static constexpr AbiLayout AbiBuild852_6()
+{
+    AbiLayout a{};
+    // Verificado en runtime: ahi vive el CMatRenderContext embebido, y su
+    // primer dword es la vtable en RVA 0x9C974.
+    a.msRenderContextEmbedded  = 0x22B4;
+    a.msRenderContextVtableRva = 0x9C974;
+
+    // IMaterialSystem. Mismo patron que corehub: delta -2 hasta
+    // GetBackBufferFormat (SpewDriverInfo, retail 33, cae en 31) y -3 desde
+    // SupportsHDRMode (BeginFrame, retail 41, cae en 38). O sea que a este
+    // build tampoco le existe GetAspectRatioInfo, que es posterior a dic 2010.
+    a.msGetBackBufferFormat = 33;   // retail 35
+    // Y -4 en la zona de los render targets. El grupo se identifica por el
+    // conteo de parametros: [88] y [89] 0 params, [90] 5, [91] 8, [92] 8 con
+    // dos char (CreateNamedRenderTargetTexture) y [93] 8.
+    a.msBeginRenderTargetAllocation      = 88;   // retail 92
+    a.msEndRenderTargetAllocation        = 89;   // retail 93
+    a.msCreateNamedRenderTargetTextureEx = 91;   // retail 95
+
+    // Esta era la causa del crash historico de este build. El mod llamaba el
+    // indice 92 creyendo que era BeginRenderTargetAllocation; en 852_6 el 92 es
+    // CreateNamedRenderTargetTexture, de ocho argumentos, invocada sin ninguno.
+    // "Completaba" y dejaba la pila rota, y el proceso moria despues.
+
+    // BeginRenderTargetAllocation decompilado se autoidentifica por su Warning
+    // y solo incrementa el contador si this[0x2b58] es 0.
+    a.msIsGameRunning = 0x2B58;   // retail 0x2BB0, corehub 0x2A88
+
+    // IMatRenderContext. SetRenderTarget y ClearBuffers coinciden en shape con
+    // los de corehub, que estan verificados por decompilacion.
+    a.rcRelease         = 1;
+    a.rcSetRenderTarget = 6;
+    a.rcClearBuffers    = 12;
+
+    // Sin derivar. Retail los tiene en 74 y 185, pero la vtable de este build
+    // esta corrida (Viewport 38 vs 39, Pop 109 vs 111) y no de forma uniforme,
+    // asi que el indice de retail no sirve. Se saltean: solo los usa el camino
+    // del HUD. Llamarlos por el indice equivocado corrompe la pila, que es
+    // justo el bug que costo mas caro encontrar en corehub.
+    a.rcClearColor4ub            = kAbiUnknown;
+    a.rcOverrideAlphaWriteEnable = kAbiUnknown;
+
+    // ISurface: corehub esta -2 contra este build, y el 54 de corehub esta
+    // verificado en runtime, asi que estos dos son los de retail.
+    a.sfIsCursorVisible = 56;
+    a.sfGetScreenSize   = 42;
+    return a;
+}
+
+static constexpr AbiLayout AbiBuild852_0()
+{
+    AbiLayout a{};
+
+    // IMaterialSystem. Delta contra retail: -2 hasta GetBackBufferFormat, -3
+    // desde SupportsHDRMode (falta GetAspectRatioInfo, que es posterior a 2009),
+    // y -10 en la zona de los render targets.
+    a.msGetBackBufferFormat              = 33;   // retail 35
+    a.msBeginRenderTargetAllocation      = 82;   // retail 92, 0 params
+    a.msEndRenderTargetAllocation        = 83;   // retail 93, 0 params
+    a.msCreateNamedRenderTargetTextureEx = 85;   // retail 95, 8 params
+
+    // De CMaterialSystem::BeginFrame decompilado: cuando el contexto
+    // thread-local es null cae a (CMaterialSystem*)this + 0x899 ints = +0x2264.
+    a.msRenderContextEmbedded  = 0x2264;
+    a.msRenderContextVtableRva = 0x943C4;
+
+    // Identificado decompilando BeginRenderTargetAllocation, que se autoidentifica
+    // por su Warning "Tried BeginRenderTargetAllocation after game startup":
+    //
+    //   if (this[0x2a88] == 0) { this[0x2a84]++; ... } else { Warning(...); }
+    //
+    // y CreateNamedRenderTargetTextureEx devuelve NULL si this[0x2a84] == 0.
+    // O sea que sin bajar este flag no se puede asignar ningun render target
+    // despues del arranque, que es exactamente para lo que el mod lo usa.
+    a.msIsGameRunning = 0x2A88;  // retail 0x2BB0
+
+    // IVEngineClient. corehub tiene un metodo insertado en el slot 14, asi que
+    // de ahi en adelante va corrido +1 contra retail. Verificado decompilando:
+    // el slot 20 contiene el literal
+    //   "CEngineClient::SetViewAngles:  rejecting invalid value [%f %f %f]"
+    // y el 26 hace return state[0x68] == 6, o sea SIGNONSTATE_FULL.
+    a.ecClientCmd      = 7;      // igual que retail
+    a.ecGetLocalPlayer = 12;     // igual que retail
+    a.ecGetViewAngles  = 19;     // retail 18
+    a.ecSetViewAngles  = 20;     // retail 19
+    a.ecIsInGame       = 26;     // retail 25
+
+    // Retail lo tiene en 108, casi 90 slots despues del ultimo corrimiento
+    // verificado. No se puede extrapolar el +1 hasta ahi: entre medio puede
+    // haber mas inserciones. Solo lo usan los bindings de los controles.
+    a.ecClientCmdUnrestricted = kAbiUnknown;
+
+    // ISurface. CMatSystemSurface va corrido -2 contra 852_6, verificado
+    // comparando las shapes de los slots 40-43 y 54-58.
+    a.sfIsCursorVisible = 54;   // retail 56
+    a.sfGetScreenSize   = 40;   // retail 42
+
+    // Retail los tiene en 114/133/139, y la vtable de corehub tiene ~90 slots:
+    // el override de tamano de pantalla no existe en este build. Los tres se
+    // usan juntos en VR::SetScreenSizeOverride, que queda como no-op.
+    a.sfForceScreenSizeOverride    = kAbiUnknown;
+    a.sfOnScreenSizeChanged        = kAbiUnknown;
+    a.sfIsScreenSizeOverrideActive = kAbiUnknown;
+
+    // IInput (CInputWin32) no necesita entradas: las vtables de corehub y 852_6
+    // coinciden byte a byte en los slots que usa el mod (SetCursorPos 7,
+    // InternalMouseWheeled 71).
+
+    // IMatRenderContext.
+    a.rcRelease         = 1;     // heredado de IRefCounted
+    a.rcSetRenderTarget = 6;     // igual que retail
+    a.rcClearBuffers    = 12;    // igual que retail: llama vt[8] y shaderapi+0xF8
+    a.rcClearColor4ub   = 73;    // retail 74; shaderapi+0x100
+
+    // Sin identificar: el dump paso el final real de la vtable y no se puede
+    // confiar en los slots del final. Solo lo usa el camino del HUD, que no
+    // esta en el camino critico de estereo + head tracking.
+    a.rcOverrideAlphaWriteEnable = kAbiUnknown;
+    return a;
+}
+
 static const BuildProfile kProfiles[] = {
-    // 0x22B4: verificado en runtime -- ahi vive el CMatRenderContext embebido,
-    // su primer dword es la vtable en RVA 0x9C974.
-    { "852_6-dec2010", "Dec  1 2010", kBuild852_6, (int)(sizeof(kBuild852_6)/sizeof(OffsetDef)), 0x22B4 },
-    { "retail-2011",   nullptr,        kRetail2011, (int)(sizeof(kRetail2011)/sizeof(OffsetDef)), 0 },
+    { "852_0-jul2009", "Jul 28 2009", kBuild852_0, (int)(sizeof(kBuild852_0)/sizeof(OffsetDef)), AbiBuild852_0() },
+    { "852_6-dec2010", "Dec  1 2010", kBuild852_6, (int)(sizeof(kBuild852_6)/sizeof(OffsetDef)), AbiBuild852_6() },
+    { "retail-2011",   nullptr,       kRetail2011, (int)(sizeof(kRetail2011)/sizeof(OffsetDef)), AbiRetail2011() },
 };
 static const int kProfileCount = (int)(sizeof(kProfiles)/sizeof(BuildProfile));
 
