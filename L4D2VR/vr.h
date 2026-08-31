@@ -177,6 +177,11 @@ public:
 	TrackedDevicePoseData m_LeftControllerPose;
 	TrackedDevicePoseData m_RightControllerPose;
 
+	// Ultimos angulos que el mod le fijo al engine, para poder medir cuanto los
+	// roto el engine por su cuenta al cruzar un portal.
+	QAngle m_LastSetViewAngles = {0, 0, 0};
+	bool m_HasLastSetViewAngles = false;
+
 	bool m_ApplyPortalRotationOffset = false;
 	QAngle m_PortalRotationOffset = {0, 0, 0};
 	QAngle m_RotationOffset = { 0, 0, 0 };

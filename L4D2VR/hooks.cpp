@@ -304,19 +304,55 @@ void __fastcall Hooks::dRenderView(void *ecx, void *edx, CViewSetup &setup, CVie
 
 	Vector position = vsSetup.Origin();
 
-	if (m_VR->m_ApplyPortalRotationOffset) {
-		Vector vec = position - m_VR->m_SetupOrigin;
-		float distance = sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
+	// Deteccion de teleport por salto de posicion en un frame.
+	Vector vec = position - m_VR->m_SetupOrigin;
+	const float distance = sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
+	const bool teleported = (distance > 35);
 
-		// Rudimentary portalling detection
-		if (distance > 35) {
-			//m_VR->m_RotationOffset.x += m_VR->m_PortalRotationOffset.x;
-			m_VR->m_RotationOffset.y += m_VR->m_PortalRotationOffset.y;
-			//m_VR->m_RotationOffset.z += m_VR->m_PortalRotationOffset.z;
+	if (teleported)
+	{
+		// Cuanto giro el engine la vista por su cuenta desde el frame anterior.
+		//
+		// El mod le fija los angulos al engine en cada frame, asi que la
+		// rotacion que el engine aplica al cruzar un portal se pierde salvo que
+		// alguien la capture. En retail eso lo hace el detour de
+		// PlayerPortalled; en corehub ese offset no esta portado y el user
+		// message EntityPortalled no se usa para el teleport del jugador (se
+		// verifico: el hook queda activo y nunca dispara). Asi que se mide
+		// directamente, comparando lo que el engine tiene ahora contra lo que
+		// el mod le dejo el frame pasado.
+		float portalYaw = 0.0f;
 
+		if (m_VR->m_ApplyPortalRotationOffset)
+		{
+			// Un detour lo capturo de forma exacta: preferirlo.
+			portalYaw = m_VR->m_PortalRotationOffset.y;
+			m_VR->m_ApplyPortalRotationOffset = false;
+		}
+		else if (m_VR->m_HasLastSetViewAngles)
+		{
+			QAngle engineAngles;
+			m_Game->Ec_GetViewAngles(engineAngles);
+
+			float d = engineAngles.y - m_VR->m_LastSetViewAngles.y;
+			while (d > 180.0f)  d -= 360.0f;
+			while (d < -180.0f) d += 360.0f;
+
+			// Entre nuestro set y esta lectura el engine tambien metio el mouse
+			// de un frame, que son pocos grados. El umbral separa una cosa de la
+			// otra: por debajo se asume mouse y se ignora.
+			if (d > 5.0f || d < -5.0f)
+				portalYaw = d;
+		}
+
+		if (portalYaw != 0.0f)
+		{
+			m_VR->m_RotationOffset.y += portalYaw;
 			m_VR->UpdateHMDAngles();
 
-			m_VR->m_ApplyPortalRotationOffset = false;
+			char m[128];
+			sprintf_s(m, "portal: salto %.0f u, yaw %.1f grados", distance, portalYaw);
+			Game::LogInit(m, nullptr);
 		}
 	}
 
@@ -339,6 +375,11 @@ void __fastcall Hooks::dRenderView(void *ecx, void *edx, CViewSetup &setup, CVie
 	// controla el render: la imagen sigue inclinandose con la cabeza.
 	QAngle inGameAngle(hmdAngle.x, hmdAngle.y, 0.0f);
 	m_Game->Ec_SetViewAngles(inGameAngle);
+
+	// Referencia para el frame siguiente: lo que el engine tenga distinto de
+	// esto lo puso el, no nosotros.
+	m_VR->m_LastSetViewAngles = inGameAngle;
+	m_VR->m_HasLastSetViewAngles = true;
 	RV_TRACE(6, "6: SetViewAngles ok");
 
 	float aspect = vsSetup.AspectRatio();
