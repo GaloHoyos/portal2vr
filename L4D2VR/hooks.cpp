@@ -221,23 +221,73 @@ void __fastcall Hooks::dRenderView(void *ecx, void *edx, CViewSetup &setup, CVie
 		m_VR->CreateVRTextures();
 	}
 
+	// Traza de una sola pasada por etapa. Es la primera vez que el mod llega a
+	// ejecutar el cuerpo de RenderView en estos builds, asi que hasta aca todo
+	// es territorio nuevo.
+	static int s_step = 0;
+	#define RV_TRACE(n, what) do { if (s_step < (n)) { s_step = (n); Game::LogInit("dRenderView " what, (void *)(intptr_t)(n)); } } while (0)
+
+	RV_TRACE(1, "1: texturas ok");
+
+	// Los campos de CViewSetup se leen con el layout de retail (sizeof 0x104).
+	// Si ese layout no aplica a este build, estos numeros salen absurdos, y
+	// todas las escrituras de abajo estarian pisando cualquier cosa.
+	// P2VR_DUMPVIEWSETUP=1 vuelca una vez el CViewSetup crudo que pasa el
+	// engine. Es como se derivo el layout de corehub: se buscan a ojo dos
+	// enteros con el tamano del viewport, un float con el fov, tres con la
+	// posicion del jugador y tres con los angulos. Si el estereo sale
+	// deformado en un build nuevo, empezar por aca.
+	static int s_dumpVs = -1;
+	if (s_dumpVs < 0)
+	{
+		char v[8]; size_t n = 0;
+		s_dumpVs = (getenv_s(&n, v, sizeof(v), "P2VR_DUMPVIEWSETUP") == 0 && n > 1) ? 1 : 0;
+	}
+
+	if (s_dumpVs && s_step < 2)
+	{
+		const unsigned char *p = (const unsigned char *)&setup;
+		for (int off = 0; off < 0x110; off += 16)
+		{
+			char m[256];
+			int   i0 = *(const int   *)(p + off + 0),  i1 = *(const int   *)(p + off + 4);
+			int   i2 = *(const int   *)(p + off + 8),  i3 = *(const int   *)(p + off + 12);
+			float f0 = *(const float *)(p + off + 0),  f1 = *(const float *)(p + off + 4);
+			float f2 = *(const float *)(p + off + 8),  f3 = *(const float *)(p + off + 12);
+			sprintf_s(m, "VS+%03X  i: %11d %11d %11d %11d   f: %12.3f %12.3f %12.3f %12.3f",
+				off, i0, i1, i2, i3, f0, f1, f2, f3);
+			Game::LogInit(m, nullptr);
+		}
+		s_step = 2;
+	}
+
 	if (m_Game->Sf_IsCursorVisible())
+	{
+		RV_TRACE(4, "4: cursor visible -> original");
 		return hkRenderView.fOriginal(ecx, setup, hudViewSetup, nClearFlags, whatToDraw);
+	}
+	RV_TRACE(5, "5: cursor no visible, sigue el camino VR");
 
 	//VPanel* g_pFullscreenRootPanel = *(VPanel**)(m_Game->m_Offsets->g_pFullscreenRootPanel.address);
 
 	// (el IMaterialSystem local se fue: las llamadas van por los thunks de Game)
 
-	hudViewSetup.width = m_VR->m_RenderWidth;
-	hudViewSetup.height = m_VR->m_RenderHeight;
-	hudViewSetup.fov = m_VR->m_Fov;
-	//hudViewSetup.fovViewmodel = m_VR->m_Fov;
-	hudViewSetup.m_flAspectRatio = m_VR->m_Aspect;
+	// Los campos de CViewSetup se tocan por los offsets del build, no por la
+	// declaracion de C++ de sdk/sdk.h, que es la de retail. Ver ViewSetupRef.
+	const ViewSetupLayout &vsl = m_Game->Abi().vs;
+	ViewSetupRef vsSetup(&setup, vsl);
+	ViewSetupRef vsHud(&hudViewSetup, vsl);
 
-	hudViewSetup.m_nUnscaledWidth = m_VR->m_RenderWidth;
-	hudViewSetup.m_nUnscaledHeight = m_VR->m_RenderHeight;
+	vsHud.Width() = m_VR->m_RenderWidth;
+	vsHud.Height() = m_VR->m_RenderHeight;
+	vsHud.Fov() = m_VR->m_Fov;
+	//vsHud.FovViewmodel() = m_VR->m_Fov;
+	vsHud.AspectRatio() = m_VR->m_Aspect;
 
-	Vector position = setup.origin;
+	vsHud.SetUnscaledWidth(m_VR->m_RenderWidth);
+	vsHud.SetUnscaledHeight(m_VR->m_RenderHeight);
+
+	Vector position = vsSetup.Origin();
 
 	if (m_VR->m_ApplyPortalRotationOffset) {
 		Vector vec = position - m_VR->m_SetupOrigin;
@@ -257,52 +307,64 @@ void __fastcall Hooks::dRenderView(void *ecx, void *edx, CViewSetup &setup, CVie
 
 	m_VR->m_SetupOrigin = position;
 
+	RV_TRACE(5, "5: antes de GetViewAngle");
 	Vector hmdAngle = m_VR->GetViewAngle();
 	QAngle inGameAngle(hmdAngle.x, hmdAngle.y, hmdAngle.z);
 	m_Game->Ec_SetViewAngles(inGameAngle);
+	RV_TRACE(6, "6: SetViewAngles ok");
 
-	float aspect = setup.m_flAspectRatio;
+	float aspect = vsSetup.AspectRatio();
 
-	setup.x = 0;
-	setup.y = 0;
-	setup.width = m_VR->m_RenderWidth;
-	setup.height = m_VR->m_RenderHeight;
-	setup.m_nUnscaledWidth = m_VR->m_RenderWidth;
-	setup.m_nUnscaledHeight = m_VR->m_RenderHeight;
-	setup.fov = m_VR->m_Fov;
-	setup.fovViewmodel = m_VR->m_Fov;
-	setup.m_flAspectRatio = m_VR->m_Aspect;
-	setup.zNear = 6;
-	setup.zNearViewmodel = 2;
-	setup.angles = hmdAngle;
+	vsSetup.X() = 0;
+	vsSetup.Y() = 0;
+	vsSetup.Width() = m_VR->m_RenderWidth;
+	vsSetup.Height() = m_VR->m_RenderHeight;
+	vsSetup.SetUnscaledWidth(m_VR->m_RenderWidth);
+	vsSetup.SetUnscaledHeight(m_VR->m_RenderHeight);
+	vsSetup.Fov() = m_VR->m_Fov;
+	vsSetup.FovViewmodel() = m_VR->m_Fov;
+	vsSetup.AspectRatio() = m_VR->m_Aspect;
+	vsSetup.ZNear() = 6;
+	vsSetup.ZNearViewmodel() = 2;
+	vsSetup.Angles() = QAngle(hmdAngle.x, hmdAngle.y, hmdAngle.z);
 
+	RV_TRACE(7, "7: escrituras a setup ok");
 	CViewSetup leftEyeView = setup;
 	CViewSetup rightEyeView = setup;
+	ViewSetupRef vsLeft(&leftEyeView, vsl);
+	ViewSetupRef vsRight(&rightEyeView, vsl);
+	RV_TRACE(8, "8: copias de CViewSetup ok");
 
 	int playerIndex = m_Game->Ec_GetLocalPlayer();
 	C_BasePlayer* localPlayer = (C_BasePlayer*)m_Game->GetClientEntity(playerIndex);
+	if (s_step < 9) { char m[128]; sprintf_s(m, "9: playerIndex=%d localPlayer", playerIndex); Game::LogInit(m, localPlayer); s_step = 9; }
 
 	// Left eye CViewSetup
-	QAngle tempAngle = QAngle(setup.angles.x, setup.angles.y, setup.angles.z);
-	leftEyeView.origin = m_VR->TraceEye((uint32_t*)localPlayer, position, m_VR->GetViewOriginLeft(position), tempAngle);
-	leftEyeView.angles.y = tempAngle.y;
+	QAngle tempAngle = vsSetup.Angles();
+	RV_TRACE(10, "10: antes de TraceEye");
+	vsLeft.Origin() = m_VR->TraceEye((uint32_t*)localPlayer, position, m_VR->GetViewOriginLeft(position), tempAngle);
+	RV_TRACE(11, "11: TraceEye ok");
+	vsLeft.Angles().y = tempAngle.y;
 
 	//std::cout << "dRenderView - Left Start\n";
 	IMatRenderContext* rndrContext = m_Game->GetRenderContext();
 	m_Game->Rc_SetRenderTarget(rndrContext, m_VR->m_LeftEyeTexture);
 	m_Game->ReleaseRenderContext(rndrContext);
+	RV_TRACE(12, "12: antes del fOriginal del ojo izq");
 	hkRenderView.fOriginal(ecx, leftEyeView, hudViewSetup, nClearFlags, whatToDraw);
+	RV_TRACE(13, "13: ojo izq renderizado");
 	
 	// Right eye CViewSetup
-	tempAngle = QAngle(setup.angles.x, setup.angles.y, setup.angles.z);
-	rightEyeView.origin = m_VR->TraceEye((uint32_t*)localPlayer, position, m_VR->GetViewOriginRight(position), tempAngle);
-	rightEyeView.angles.y = tempAngle.y;
+	tempAngle = vsSetup.Angles();
+	vsRight.Origin() = m_VR->TraceEye((uint32_t*)localPlayer, position, m_VR->GetViewOriginRight(position), tempAngle);
+	vsRight.Angles().y = tempAngle.y;
 
 	//std::cout << "dRenderView - Right Start\n";
 	rndrContext = m_Game->GetRenderContext();
 	m_Game->Rc_SetRenderTarget(rndrContext, m_VR->m_RightEyeTexture);
 	m_Game->ReleaseRenderContext(rndrContext);
 	hkRenderView.fOriginal(ecx, rightEyeView, hudViewSetup, nClearFlags, whatToDraw);
+	RV_TRACE(14, "14: ojo der renderizado");
 
 	m_PushedHud = false;
 
@@ -329,7 +391,7 @@ void __fastcall Hooks::dRenderView(void *ecx, void *edx, CViewSetup &setup, CVie
 	rndrContext->Release();*/
 
 	if (m_VR->m_RenderWindow) {
-		setup.m_flAspectRatio = aspect;
+		vsSetup.AspectRatio() = aspect;
 
 		//setup.width, setup.height
 		hkRenderView.fOriginal(ecx, setup, hudViewSetup, nClearFlags, whatToDraw);

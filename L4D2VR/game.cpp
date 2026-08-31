@@ -172,6 +172,30 @@ void *Game::GetInterfaceAny(const char *dllname, std::initializer_list<const cha
     return nullptr;
 }
 
+// --- CViewSetup por offsets del build --------------------------------------
+
+int    &ViewSetupRef::X()              { return At<int>(m_L->x); }
+int    &ViewSetupRef::Y()              { return At<int>(m_L->y); }
+int    &ViewSetupRef::Width()          { return At<int>(m_L->width); }
+int    &ViewSetupRef::Height()         { return At<int>(m_L->height); }
+float  &ViewSetupRef::Fov()            { return At<float>(m_L->fov); }
+float  &ViewSetupRef::FovViewmodel()   { return At<float>(m_L->fovViewmodel); }
+float  &ViewSetupRef::AspectRatio()    { return At<float>(m_L->aspectRatio); }
+float  &ViewSetupRef::ZNear()          { return At<float>(m_L->zNear); }
+float  &ViewSetupRef::ZNearViewmodel() { return At<float>(m_L->zNearViewmodel); }
+Vector &ViewSetupRef::Origin()         { return At<Vector>(m_L->origin); }
+QAngle &ViewSetupRef::Angles()         { return At<QAngle>(m_L->angles); }
+
+void ViewSetupRef::SetUnscaledWidth(int v)
+{
+    if (m_L->unscaledWidth >= 0) *(int *)(m_p + m_L->unscaledWidth) = v;
+}
+
+void ViewSetupRef::SetUnscaledHeight(int v)
+{
+    if (m_L->unscaledHeight >= 0) *(int *)(m_p + m_L->unscaledHeight) = v;
+}
+
 // --- Capa ABI ----------------------------------------------------------------
 //
 // Llamar un metodo virtual por el indice equivocado no falla: devuelve basura o

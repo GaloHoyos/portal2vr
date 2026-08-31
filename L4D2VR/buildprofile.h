@@ -16,6 +16,30 @@ struct OffsetDef
     int         sigOffset;
 };
 
+// Offsets de los campos de CViewSetup que toca dRenderView. -1 = el campo no
+// existe en ese build (escribirlo es un no-op, leerlo devuelve 0).
+//
+// Los defaults son los de retail, que es lo que declara sdk/sdk.h.
+// Verificado volcando el struct crudo que pasa el engine: en corehub width y
+// height aparecen en +0x08/+0x0C con 1280/720, y los DoF por defecto
+// (20/100/250/1000/10/5) confirman donde termina el bloque de zNear/zFar.
+struct ViewSetupLayout
+{
+    int x              = 0x00;
+    int y              = 0x08;
+    int width          = 0x10;
+    int height         = 0x18;
+    int unscaledWidth  = 0x14;   // splitscreen: no existe antes de retail
+    int unscaledHeight = 0x1C;
+    int fov            = 0x68;
+    int fovViewmodel   = 0x6C;
+    int origin         = 0x70;   // Vector
+    int angles         = 0x7C;   // QAngle
+    int zNear          = 0x88;
+    int zNearViewmodel = 0x90;
+    int aspectRatio    = 0x98;
+};
+
 // Valores especiales para los indices de vtable de AbiLayout.
 enum : int
 {
@@ -85,6 +109,18 @@ struct AbiLayout
     int ecGetViewAngles         = kAbiCxx;
     int ecSetViewAngles         = kAbiCxx;
     int ecIsInGame              = kAbiCxx;
+
+    // --- CViewSetup: layout del struct ---
+    //
+    // sdk/sdk.h lo declara con el layout de retail, y dRenderView no solo lee
+    // sus campos: los escribe. Si el layout no es el de este build, esas
+    // escrituras pisan lo que sea que viva en esos offsets, y el engine se cae
+    // bastante despues.
+    //
+    // Retail intercala los campos m_nUnscaled* (splitscreen), que corren todo
+    // lo demas; los builds de 2009/2010 usan el layout clasico de Source.
+    // -1 = el campo no existe en este build, y escribirlo es un no-op.
+    ViewSetupLayout vs{};
 
     // --- ISurface (vguimatsurface): indices de vtable ---
     //

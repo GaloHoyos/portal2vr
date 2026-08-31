@@ -9,6 +9,53 @@
 #include "material.h"
 
 struct AbiLayout;
+struct ViewSetupLayout;
+
+// Acceso a los campos de CViewSetup por los offsets del build activo, en vez de
+// por la declaracion de C++ de sdk/sdk.h, que es la de retail.
+//
+// Retail intercala cuatro campos m_nUnscaled* que los builds de 2009/2010 no
+// tienen, asi que todo lo de abajo queda corrido: escribir setup.width con el
+// offset de retail pisa las bounds del ortho, y setup.angles pisa parametros de
+// depth of field. Un campo con offset -1 no existe en el build: escribirlo es
+// un no-op y leerlo devuelve cero.
+class ViewSetupRef
+{
+public:
+    ViewSetupRef(void *setup, const ViewSetupLayout &layout)
+        : m_p((char *)setup), m_L(&layout) {}
+
+    // Los offsets salen de ViewSetupLayout; ver buildprofile.h.
+    int &X();
+    int &Y();
+    int &Width();
+    int &Height();
+    float &Fov();
+    float &FovViewmodel();
+    float &AspectRatio();
+    float &ZNear();
+    float &ZNearViewmodel();
+    Vector &Origin();
+    QAngle &Angles();
+
+    // Estos dos no existen antes de retail, asi que son setters y no
+    // referencias: no hay a donde apuntar cuando el campo no esta.
+    void SetUnscaledWidth(int v);
+    void SetUnscaledHeight(int v);
+
+private:
+    char *m_p;
+    const ViewSetupLayout *m_L;
+
+    // Devuelve un descarte cuando el campo no existe, para que el llamador
+    // pueda escribirlo sin ramificar.
+    template <typename T> T &At(int off)
+    {
+        static T discard{};
+        if (off < 0) { discard = T{}; return discard; }
+        return *(T *)(m_p + off);
+    }
+};
 
 class IClientEntityList;
 class IMatRenderContext;

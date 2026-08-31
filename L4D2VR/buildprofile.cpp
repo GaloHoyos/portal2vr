@@ -154,6 +154,28 @@ static const OffsetDef kBuild852_0[] = {
 // (prototipos decompilados). Cada uno se verifico por separado: el corrimiento
 // contra retail no es uniforme dentro de una misma vtable.
 
+// El CViewSetup de Source antes del splitscreen: sin los cuatro m_nUnscaled*
+// que retail intercala entre x/y/width/height, asi que todo lo de abajo queda
+// corrido. Lo usan corehub (jul 2009) y 852_6 (dic 2010).
+static constexpr ViewSetupLayout ViewSetupClassicSource()
+{
+    ViewSetupLayout v{};
+    v.x              = 0x00;
+    v.y              = 0x04;
+    v.width          = 0x08;
+    v.height         = 0x0C;
+    v.unscaledWidth  = -1;      // no existen todavia
+    v.unscaledHeight = -1;
+    v.fov            = 0x24;
+    v.fovViewmodel   = 0x28;
+    v.origin         = 0x2C;
+    v.angles         = 0x38;
+    v.zNear          = 0x44;
+    v.zNearViewmodel = 0x4C;
+    v.aspectRatio    = 0x54;
+    return v;
+}
+
 static constexpr AbiLayout AbiRetail2011()
 {
     AbiLayout a{};
@@ -211,6 +233,12 @@ static constexpr AbiLayout AbiBuild852_6()
     // verificado en runtime, asi que estos dos son los de retail.
     a.sfIsCursorVisible = 56;
     a.sfGetScreenSize   = 42;
+
+    // Mismo layout clasico que corehub. Dic 2010 sigue sin los m_nUnscaled*,
+    // que llegan con el splitscreen de retail. Sin verificar contra el struct
+    // vivo: si el estereo sale deformado aca, esto es lo primero que hay que
+    // volcar (ver el bloque VS+ de dRenderView).
+    a.vs = ViewSetupClassicSource();
     return a;
 }
 
@@ -261,6 +289,14 @@ static constexpr AbiLayout AbiBuild852_0()
     // comparando las shapes de los slots 40-43 y 54-58.
     a.sfIsCursorVisible = 54;   // retail 56
     a.sfGetScreenSize   = 40;   // retail 42
+
+    // CViewSetup: layout clasico de Source, sin los m_nUnscaled* que retail
+    // intercala. Verificado volcando el struct crudo que pasa el engine:
+    //   +0x08/+0x0C = 1280/720 (el viewport)
+    //   +0x24 = 73.74 (fov), +0x2C = origin, +0x38 = angles
+    //   +0x58..+0x6C = 20/100/250/1000/10/5, los DoF por defecto, que marcan
+    //   donde termina el bloque de zNear/zFar/aspect.
+    a.vs = ViewSetupClassicSource();
 
     // Retail los tiene en 114/133/139, y la vtable de corehub tiene ~90 slots:
     // el override de tamano de pantalla no existe en este build. Los tres se
