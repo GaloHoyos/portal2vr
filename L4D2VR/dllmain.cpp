@@ -15,6 +15,13 @@ DWORD WINAPI InitL4D2VR(HMODULE hModule)
     freopen_s(&fp, "CONOUT$", "w", stdout);
 #endif
 
+    // P2VR_DISABLE=1 deja DXVK puro, sin nada del mod. Control de aislamiento.
+    {
+        char off[8]; size_t n = 0;
+        if (getenv_s(&n, off, sizeof(off), "P2VR_DISABLE") == 0 && n > 1)
+            return 0;
+    }
+
     // Make sure -insecure is used
     LPWSTR *szArglist;
     int nArgs;
@@ -30,7 +37,19 @@ DWORD WINAPI InitL4D2VR(HMODULE hModule)
     if (!insecureEnabled)
         ExitProcess(0);
 
-    g_Game = new Game();
+    // P2VR_STAGE=0 corta aca: se hizo el chequeo de -insecure pero no se
+    // construye Game. Aisla el chequeo de los bucles de espera de modulos.
+    {
+        char v[8]; size_t n = 0;
+        if (getenv_s(&n, v, sizeof(v), "P2VR_STAGE") == 0 && n > 1 && atoi(v) == 0)
+            return 0;
+    }
+
+    // Construir primero y publicar despues: el hilo de render de DXVK consulta
+    // g_Game, y el constructor tarda (espera a que carguen los modulos del
+    // juego). Si se asigna antes, ese hilo ve un Game a medio armar.
+    Game *game = new Game();
+    g_Game = game;
 
     return 0;
 }

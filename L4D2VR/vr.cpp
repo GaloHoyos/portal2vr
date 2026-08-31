@@ -1,4 +1,4 @@
-#include "vr.h"
+﻿#include "vr.h"
 #include <Windows.h>
 #include "sdk.h"
 #include "game.h"
@@ -42,8 +42,11 @@ VR::VR(Game *game)
     m_Input = vr::VRInput();
     m_System = vr::OpenVRInternal_ModuleContext().VRSystem();
 
+    Game::LogInit("VR: compositor ok, m_System", m_System);
+
     m_System->GetRecommendedRenderTargetSize(&m_RenderWidth, &m_RenderHeight);
     m_AntiAliasing = 0;
+    Game::LogInit("VR: render target size ok", (void *)1);
 
     float l_left = 0.0f, l_right = 0.0f, l_top = 0.0f, l_bottom = 0.0f;
     m_System->GetProjectionRaw(vr::EVREye::Eye_Left, &l_left, &l_right, &l_top, &l_bottom);
@@ -69,16 +72,23 @@ VR::VR(Game *game)
     m_Aspect = tanHalfFov[0] / tanHalfFov[1];
     m_Fov = 2.0f * atan(tanHalfFov[0]) * 360 / (3.14159265358979323846 * 2);
 
+    Game::LogInit("VR: proyeccion/fov ok", (void *)1);
+
     InstallApplicationManifest("manifest.vrmanifest");
+    Game::LogInit("VR: app manifest ok", (void *)1);
     SetActionManifest("action_manifest.json");
+    Game::LogInit("VR: action manifest ok", (void *)1);
 
     std::thread configParser(&VR::WaitForConfigUpdate, this);
     configParser.detach();
+    Game::LogInit("VR: config thread lanzado", (void *)1);
 
-    while (!g_D3DVR9) 
+    while (!g_D3DVR9)
         Sleep(10);
 
+    Game::LogInit("VR: g_D3DVR9 listo", g_D3DVR9);
     g_D3DVR9->GetBackBufferData(&m_VKBackBuffer);
+    Game::LogInit("VR: backbuffer ok", (void *)1);
     m_Overlay = vr::VROverlay();
     m_Overlay->CreateOverlay("MenuOverlayKey", "MenuOverlay", &m_MainMenuHandle);
     //m_Overlay->CreateOverlay("HUDOverlayKey", "HUDOverlay", &m_HUDHandle);
@@ -87,8 +97,12 @@ VR::VR(Game *game)
     m_Overlay->SetOverlayFlag(m_MainMenuHandle, vr::VROverlayFlags_SendVRDiscreteScrollEvents, true);
     //m_Overlay->SetOverlayFlag(m_HUDHandle, vr::VROverlayFlags_SendVRDiscreteScrollEvents, true);
 
-    int windowWidth, windowHeight;
-    m_Game->m_MaterialSystem->GetRenderContext()->GetWindowSize(windowWidth, windowHeight);
+    Game::LogInit("VR: overlays creados", (void *)1);
+
+    int windowWidth = 0, windowHeight = 0;
+    m_Game->GetGameWindowSize(windowWidth, windowHeight);
+    Game::LogInit("VR: window width",  (void *)(intptr_t)windowWidth);
+    Game::LogInit("VR: window height", (void *)(intptr_t)windowHeight);
 
     //const vr::HmdVector2_t mouseScaleHUD = {windowWidth, windowHeight};
     //m_Overlay->SetOverlayMouseScale(m_HUDHandle, &mouseScaleHUD);
@@ -97,7 +111,10 @@ VR::VR(Game *game)
     m_Overlay->SetOverlayCurvature(m_MainMenuHandle, 0.15f);
     m_Overlay->SetOverlayMouseScale(m_MainMenuHandle, &mouseScaleMenu);
 
+    Game::LogInit("VR: mouse scale ok", (void *)1);
+
     UpdatePosesAndActions();
+    Game::LogInit("VR: UpdatePosesAndActions ok", (void *)1);
 
     m_IsInitialized = true;
     m_IsVREnabled = true;
@@ -183,6 +200,18 @@ void VR::Update()
     if (!m_IsInitialized || !m_Game->m_Initialized)
         return;
 
+    // P2VR_NOUPDATE=1 desactiva el update por frame. Aisla si lo que termina
+    // el proceso ocurre dentro de esta ruta (corre desde el Present de DXVK).
+    {
+        static int disabled = -1;
+        if (disabled < 0)
+        {
+            char v[8]; size_t n = 0;
+            disabled = (getenv_s(&n, v, sizeof(v), "P2VR_NOUPDATE") == 0 && n > 1) ? 1 : 0;
+        }
+        if (disabled) return;
+    }
+
     
 
     if (m_IsVREnabled && g_D3DVR9)
@@ -194,38 +223,52 @@ void VR::Update()
         // Prevents crashing at menu
         if (!inGame)
         {
-            IMatRenderContext *rndrContext = m_Game->m_MaterialSystem->GetRenderContext();
-            rndrContext->SetRenderTarget(NULL);
-            rndrContext->Release();
+            IMatRenderContext *rndrContext = m_Game->GetRenderContext();
+            if (rndrContext)
+            {
+                rndrContext->SetRenderTarget(NULL);
+                m_Game->ReleaseRenderContext(rndrContext);
+            }
 
             m_Game->m_CachedArmsModel = false;
             m_CreatedVRTextures = false; // Have to recreate textures otherwise some workshop maps won't render
         } 
     }
 
+    // Traza de una sola pasada: marca cual de estas etapas es la ultima que se
+    // registra antes de que el proceso termine.
+    static bool s_traced = false;
+    const bool trace = !s_traced;
+
+    if (trace) Game::LogInit("Update: antes de SubmitVRTextures", (void *)1);
     SubmitVRTextures();
+    if (trace) Game::LogInit("Update: antes de UpdatePosesAndActions", (void *)1);
     UpdatePosesAndActions();
+    if (trace) Game::LogInit("Update: antes de UpdateTracking", (void *)1);
     UpdateTracking();
+    if (trace) Game::LogInit("Update: antes de ProcessInput", (void *)1);
 
     if (m_Game->m_VguiSurface->IsCursorVisible()) {
         ProcessMenuInput();
     } else {
         ProcessInput();
     }
+
+    if (trace) { Game::LogInit("Update: primer frame completo", (void *)1); s_traced = true; }
 }
 
 void VR::CreateVRTextures()
 {
     int windowWidth, windowHeight;
-
-    IMatRenderContext* rndrContext = m_Game->m_MaterialSystem->GetRenderContext();
-    rndrContext->GetWindowSize(windowWidth, windowHeight);
-    rndrContext->Release();
+    m_Game->GetGameWindowSize(windowWidth, windowHeight);
 
     std::cout << "RenderTexture - Width: " << m_RenderWidth << ", Height: " << m_RenderHeight << "\n";
+    Game::LogInit("CreateVRTextures: entrada", (void *)1);
 
     m_Game->m_MaterialSystem->isGameRunning = false;
+    Game::LogInit("CreateVRTextures: antes de BeginRenderTargetAllocation", (void *)1);
     m_Game->m_MaterialSystem->BeginRenderTargetAllocation();
+    Game::LogInit("CreateVRTextures: BeginRenderTargetAllocation ok", (void *)1);
     m_Game->m_MaterialSystem->isGameRunning = true;
 
     m_CreatingTextureID = Texture_LeftEye;
@@ -241,8 +284,10 @@ void VR::CreateVRTextures()
     m_BlankTexture = m_Game->m_MaterialSystem->CreateNamedRenderTargetTextureEx("blankTexture", 512, 512, RT_SIZE_NO_CHANGE, m_Game->m_MaterialSystem->GetBackBufferFormat(), MATERIAL_RT_DEPTH_SHARED, TEXTUREFLAGS_NOMIP);
     
     m_CreatingTextureID = Texture_None;
+    Game::LogInit("CreateVRTextures: 4 texturas creadas", m_LeftEyeTexture);
 
     m_Game->m_MaterialSystem->EndRenderTargetAllocation();
+    Game::LogInit("CreateVRTextures: completo", (void *)1);
 
     m_CreatedVRTextures = true;
 }
@@ -264,7 +309,7 @@ void VR::SubmitVRTextures()
             // as a workaround only show that portion of the texture
             int windowWidth, windowHeight;
             IMatRenderContext* rndrContext = m_Game->m_MaterialSystem->GetRenderContext();
-            rndrContext->GetWindowSize(windowWidth, windowHeight);
+            m_Game->GetGameWindowSize(windowWidth, windowHeight);
             rndrContext->Release();
 
             bounds.uMax = (float)windowWidth / m_RenderWidth;
@@ -340,7 +385,7 @@ void VR::RepositionOverlays()
     Vector hmdForward = { -hmdMat.m[0][2], 0, -hmdMat.m[2][2] };
 
     int windowWidth, windowHeight;
-    m_Game->m_MaterialSystem->GetRenderContext()->GetWindowSize(windowWidth, windowHeight);
+    m_Game->GetGameWindowSize(windowWidth, windowHeight);
 
     vr::HmdMatrix34_t menuTransform = 
     {
@@ -484,7 +529,7 @@ void VR::ProcessMenuInput()
         vr::VROverlay()->SetOverlayFlag(currentOverlay, vr::VROverlayFlags_MakeOverlaysInteractiveIfVisible, true);
 
         int windowWidth, windowHeight;
-        m_Game->m_MaterialSystem->GetRenderContext()->GetWindowSize(windowWidth, windowHeight);
+        m_Game->GetGameWindowSize(windowWidth, windowHeight);
 
         vr::VREvent_t vrEvent;
         while (vr::VROverlay()->PollNextOverlayEvent(currentOverlay, &vrEvent, sizeof(vrEvent)))
@@ -991,7 +1036,9 @@ void VR::UpdateTracking()
                 portalPlayer->m_PointLaser->SetControlPoint(1, m_AimPos);
                 portalPlayer->m_PointLaser->SetControlPoint(2, m_Game->m_singlePlayerPortalColors[activeWeapon->m_iLastFiredPortal] * 0.5f);
             }
-            else {
+            else if (m_Game->m_Hooks->CreatePingPointer) {
+                // Sin este offset portado el puntero laser simplemente no se
+                // dibuja; antes se llamaba un puntero nulo y tiraba el proceso.
                 std::cout << "Creating Point Laser Beam Sight Thingy" << "\n";
                 m_Game->m_Hooks->CreatePingPointer(localPlayer, m_AimPos);
             }
@@ -1296,6 +1343,13 @@ Vector VR::TraceEye(uint32_t* localPlayer, Vector cameraPos, Vector eyePos, QAng
     m_Game->m_EngineTrace->TraceRay(ray, MASK_SHOT | MASK_SHOT_HULL, &tracefilter, &trTestObstructionsNearPortals);
 
     float flWallHitFraction = trTestObstructionsNearPortals.fraction + 0.01f;
+
+    // Sin estos dos offsets portados no hay deteccion de camara a traves de
+    // portales. Se degrada devolviendo el ojo sin reubicar, en vez de llamar
+    // punteros nulos.
+    if (!m_Game->m_Hooks->UTIL_Portal_FirstAlongRay || !m_Game->m_Hooks->UTIL_IntersectRayWithPortal)
+        return eyePos;
+
     CPortal_Base2D* pPortal = (CPortal_Base2D*)m_Game->m_Hooks->UTIL_Portal_FirstAlongRay(ray, flWallHitFraction);
 
     if (trTestObstructionsNearPortals.DidHit() && pPortal) {

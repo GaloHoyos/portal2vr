@@ -1,9 +1,11 @@
 #pragma once
 #include <cstdint>
 #include <array>
+#include <initializer_list>
 #include "vector.h"
 
 class IClientEntityList;
+class IMatRenderContext;
 class IEngineTrace;
 class IEngineClient;
 class IMaterialSystem;
@@ -83,8 +85,19 @@ public:
     Game();
 
     void *GetInterface(const char *dllname, const char *interfacename);
+    void *GetInterfaceAny(const char *dllname, std::initializer_list<const char *> versions);
+
+    // Reemplaza IMatRenderContext::GetWindowSize (indice de vtable dependiente del build).
+    void GetGameWindowSize(int &width, int &height);
+    void *m_GameWindow = nullptr;
+
+    // Usar siempre estos dos en vez de m_MaterialSystem->GetRenderContext():
+    // el indice de vtable de GetRenderContext cambia entre builds.
+    IMatRenderContext *GetRenderContext();
+    void ReleaseRenderContext(IMatRenderContext *ctx);
 
     static void errorMsg(const char *msg);
+    static void LogInit(const char *what, const void *ptr);
 
     CBaseEntity *GetClientEntity(int entityIndex);
     char *getNetworkName(uintptr_t *entity);

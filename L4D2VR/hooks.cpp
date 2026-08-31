@@ -1,4 +1,4 @@
-#include "hooks.h"
+﻿#include "hooks.h"
 #include "game.h"
 #include "texture.h"
 #include "sdk.h"
@@ -211,6 +211,12 @@ ITexture* __fastcall Hooks::dGetRenderTarget(void* ecx, void* edx)
 
 void __fastcall Hooks::dRenderView(void *ecx, void *edx, CViewSetup &setup, CViewSetup &hudViewSetup, int nClearFlags, int whatToDraw)
 {
+	static bool s_loggedFirst = false;
+	if (!s_loggedFirst) {
+		s_loggedFirst = true;
+		Game::LogInit("dRenderView: primer disparo", ecx);
+	}
+
 	if (!m_VR->m_CreatedVRTextures) {
 		m_VR->CreateVRTextures();
 	}
@@ -335,6 +341,9 @@ void __fastcall Hooks::dRenderView(void *ecx, void *edx, CViewSetup &setup, CVie
 
 bool __fastcall Hooks::dCreateMove(void *ecx, void *edx, float flInputSampleTime, CUserCmd *cmd)
 {
+	static bool s_first = false;
+	if (!s_first) { s_first = true; Game::LogInit("detour: CreateMove", ecx); }
+
 	if (!cmd->command_number)
 		return hkCreateMove.fOriginal(ecx, flInputSampleTime, cmd);
 
@@ -534,6 +543,9 @@ void Hooks::dDrawModelExecute(void *ecx, void *edx, void *state, const ModelRend
 
 void Hooks::dPushRenderTargetAndViewport(void *ecx, void *edx, ITexture *pTexture, ITexture *pDepthTexture, int nViewX, int nViewY, int nViewW, int nViewH)
 {
+	static bool s_first = false;
+	if (!s_first) { s_first = true; Game::LogInit("detour: PushRenderTargetAndViewport", ecx); }
+
 	if (m_VR->m_CreatedVRTextures && !m_PushedHud)
 	{
 		pTexture = m_VR->m_HUDTexture;
@@ -563,6 +575,9 @@ void Hooks::dPushRenderTargetAndViewport(void *ecx, void *edx, ITexture *pTextur
 
 void Hooks::dPopRenderTargetAndViewport(void *ecx, void *edx)
 {
+	static bool s_first = false;
+	if (!s_first) { s_first = true; Game::LogInit("detour: PopRenderTargetAndViewport", ecx); }
+
 	if (!m_VR->m_CreatedVRTextures)
 		return hkPopRenderTargetAndViewport.fOriginal(ecx);
 
@@ -609,6 +624,8 @@ int Hooks::dIsSplitScreen()
 DWORD *Hooks::dPrePushRenderTarget(void *ecx, void *edx, int a2)
 {
 	//std::cout << "dPrePushRenderTarget: " << m_PushHUDStep << "\n";
+	static bool s_first = false;
+	if (!s_first) { s_first = true; Game::LogInit("detour: PrePushRenderTarget", ecx); }
 
 	if (m_PushHUDStep == 1)
 		++m_PushHUDStep;
@@ -736,7 +753,7 @@ int __fastcall Hooks::dDrawSelf(void* ecx, void* edx, int x, int y, int w, int h
 	if (m_VR->m_IsVREnabled)
 	{
 		int windowWidth, windowHeight;
-		m_Game->m_MaterialSystem->GetRenderContext()->GetWindowSize(windowWidth, windowHeight);
+		m_Game->GetGameWindowSize(windowWidth, windowHeight);
 
 		Vector screen = { 0, 0, 0 };
 
