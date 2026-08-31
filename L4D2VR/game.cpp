@@ -76,10 +76,13 @@ Game::Game()
     // corehub (852_0, jul 2009) expone EngineTraceClient003; retail y 852_6, 004.
     m_EngineTrace = (IEngineTrace *)GetInterfaceAny("engine.dll",
         { "EngineTraceClient004", "EngineTraceClient003" });
-    // El build 852_6 (dic 2010) expone VEngineClient013, retail expone 015.
-    // Los indices de vtable que usa el mod (ClientCmd 7, GetLocalPlayer 12,
-    // GetViewAngles 18, SetViewAngles 19, IsInGame 25) son identicos en ambas,
-    // asi que alcanza con probar las versiones de mas nueva a mas vieja.
+    // 852_6 y corehub exponen VEngineClient013, retail expone 015. Se prueba de
+    // la mas nueva a la mas vieja.
+    //
+    // Ojo: que la version coincida NO implica que la vtable sea la misma.
+    // corehub y 852_6 dicen los dos 013 y corehub tiene un metodo insertado en
+    // el slot 14, asi que de ahi va corrido +1. Los indices salen del perfil
+    // (AbiLayout.ec*) y se llaman con los thunks Ec_*, nunca directo.
     m_EngineClient = (IEngineClient *)GetInterfaceAny("engine.dll",
         { "VEngineClient015", "VEngineClient014", "VEngineClient013" });
     m_MaterialSystem = (IMaterialSystem *)GetInterface("MaterialSystem.dll", "VMaterialSystem080");
@@ -169,10 +172,6 @@ void *Game::GetInterfaceAny(const char *dllname, std::initializer_list<const cha
     return nullptr;
 }
 
-// Devuelve el render context evitando IMaterialSystem::GetRenderContext cuando
-// el perfil del build indica el offset del contexto embebido (ver BuildProfile).
-// Ese camino NO incrementa el refcount, asi que el llamador no debe hacer
-// Release: usar ReleaseRenderContext, que sabe cual de los dos casos aplica.
 // --- Capa ABI ----------------------------------------------------------------
 //
 // Llamar un metodo virtual por el indice equivocado no falla: devuelve basura o
@@ -389,6 +388,171 @@ void Game::MatSys_SetGameRunning(bool running)
     *((bool *)((char *)m_MaterialSystem + off)) = running;
 }
 
+void Game::Ec_ClientCmd(const char *cmd)
+{
+    if (!m_EngineClient) return;
+
+    const int idx = Abi().ecClientCmd;
+    if (idx == kAbiCxx) { m_EngineClient->ClientCmd(cmd); return; }
+    if (idx < 0)        { LogAbiSkipOnce("ABI sin identificar: Ec_ClientCmd"); return; }
+
+    typedef void *(__thiscall * Fn)(void *, const char *);
+    VFn<Fn>(m_EngineClient, idx)(m_EngineClient, cmd);
+}
+
+void Game::Ec_ClientCmdUnrestricted(const char *cmd)
+{
+    if (!m_EngineClient) return;
+
+    const int idx = Abi().ecClientCmdUnrestricted;
+    if (idx == kAbiCxx) { m_EngineClient->ClientCmd_Unrestricted(cmd); return; }
+    if (idx < 0)        { LogAbiSkipOnce("ABI sin identificar: Ec_ClientCmdUnrestricted"); return; }
+
+    typedef void *(__thiscall * Fn)(void *, const char *);
+    VFn<Fn>(m_EngineClient, idx)(m_EngineClient, cmd);
+}
+
+int Game::Ec_GetLocalPlayer()
+{
+    if (!m_EngineClient) return -1;
+
+    const int idx = Abi().ecGetLocalPlayer;
+    if (idx == kAbiCxx) return m_EngineClient->GetLocalPlayer();
+    if (idx < 0)
+    {
+        LogAbiSkipOnce("ABI sin identificar: Ec_GetLocalPlayer");
+        return -1;
+    }
+
+    typedef int(__thiscall * Fn)(void *);
+    return VFn<Fn>(m_EngineClient, idx)(m_EngineClient);
+}
+
+void Game::Ec_GetViewAngles(QAngle &angles)
+{
+    if (!m_EngineClient) return;
+
+    const int idx = Abi().ecGetViewAngles;
+    if (idx == kAbiCxx) { m_EngineClient->GetViewAngles(angles); return; }
+    if (idx < 0)        { LogAbiSkipOnce("ABI sin identificar: Ec_GetViewAngles"); return; }
+
+    typedef QAngle *(__thiscall * Fn)(void *, QAngle &);
+    VFn<Fn>(m_EngineClient, idx)(m_EngineClient, angles);
+}
+
+void Game::Ec_SetViewAngles(QAngle &angles)
+{
+    if (!m_EngineClient) return;
+
+    const int idx = Abi().ecSetViewAngles;
+    if (idx == kAbiCxx) { m_EngineClient->SetViewAngles(angles); return; }
+    if (idx < 0)        { LogAbiSkipOnce("ABI sin identificar: Ec_SetViewAngles"); return; }
+
+    typedef QAngle *(__thiscall * Fn)(void *, QAngle &);
+    VFn<Fn>(m_EngineClient, idx)(m_EngineClient, angles);
+}
+
+// Cuando el indice no se conoce se devuelve true, o sea "en partida". Es el
+// valor conservador: el unico consumidor que dispara una escritura riesgosa es
+// el override de viewport de DXVK, y esta guardado por !IsInGame().
+bool Game::Ec_IsInGame()
+{
+    if (!m_EngineClient) return false;
+
+    const int idx = Abi().ecIsInGame;
+    if (idx == kAbiCxx) return m_EngineClient->IsInGame();
+    if (idx < 0)
+    {
+        LogAbiSkipOnce("ABI sin identificar: Ec_IsInGame (se asume en partida)");
+        return true;
+    }
+
+    typedef bool(__thiscall * Fn)(void *);
+    return VFn<Fn>(m_EngineClient, idx)(m_EngineClient);
+}
+
+// Cuando el indice no se conoce se devuelve false, o sea "sin cursor", que es
+// el camino de juego normal. Nunca deberia pasar: los tres perfiles lo tienen.
+bool Game::Sf_IsCursorVisible()
+{
+    if (!m_VguiSurface) return false;
+
+    const int idx = Abi().sfIsCursorVisible;
+    if (idx == kAbiCxx) return m_VguiSurface->IsCursorVisible();
+    if (idx < 0)
+    {
+        LogAbiSkipOnce("ABI sin identificar: Sf_IsCursorVisible");
+        return false;
+    }
+
+    typedef bool(__thiscall * Fn)(void *);
+    return VFn<Fn>(m_VguiSurface, idx)(m_VguiSurface);
+}
+
+void Game::Sf_GetScreenSize(int &wide, int &tall)
+{
+    wide = 0; tall = 0;
+    if (!m_VguiSurface) return;
+
+    const int idx = Abi().sfGetScreenSize;
+    if (idx == kAbiCxx) { m_VguiSurface->GetScreenSize(wide, tall); return; }
+    if (idx < 0)        { LogAbiSkipOnce("ABI sin identificar: Sf_GetScreenSize"); return; }
+
+    typedef void(__thiscall * Fn)(void *, int &, int &);
+    VFn<Fn>(m_VguiSurface, idx)(m_VguiSurface, wide, tall);
+}
+
+void Game::Sf_ForceScreenSizeOverride(bool state, int wide, int tall)
+{
+    if (!m_VguiSurface) return;
+
+    const int idx = Abi().sfForceScreenSizeOverride;
+    if (idx == kAbiCxx) { m_VguiSurface->ForceScreenSizeOverride(state, wide, tall); return; }
+    if (idx < 0)        { LogAbiSkipOnce("ABI sin identificar: Sf_ForceScreenSizeOverride"); return; }
+
+    typedef bool(__thiscall * Fn)(void *, bool, int, int);
+    VFn<Fn>(m_VguiSurface, idx)(m_VguiSurface, state, wide, tall);
+}
+
+void Game::Sf_OnScreenSizeChanged(int oldWide, int oldTall)
+{
+    if (!m_VguiSurface) return;
+
+    const int idx = Abi().sfOnScreenSizeChanged;
+    if (idx == kAbiCxx) { m_VguiSurface->OnScreenSizeChanged(oldWide, oldTall); return; }
+    if (idx < 0)        { LogAbiSkipOnce("ABI sin identificar: Sf_OnScreenSizeChanged"); return; }
+
+    typedef void(__thiscall * Fn)(void *, int, int);
+    VFn<Fn>(m_VguiSurface, idx)(m_VguiSurface, oldWide, oldTall);
+}
+
+bool Game::Sf_IsScreenSizeOverrideActive()
+{
+    if (!m_VguiSurface) return false;
+
+    const int idx = Abi().sfIsScreenSizeOverrideActive;
+    if (idx == kAbiCxx) return m_VguiSurface->IsScreenSizeOverrideActive();
+    if (idx < 0)
+    {
+        LogAbiSkipOnce("ABI sin identificar: Sf_IsScreenSizeOverrideActive");
+        return false;
+    }
+
+    typedef bool(__thiscall * Fn)(void *);
+    return VFn<Fn>(m_VguiSurface, idx)(m_VguiSurface);
+}
+
+// El override de tamano de pantalla es un bloque: sin los tres metodos no tiene
+// sentido llamar ninguno, porque se dejaria a VGUI en un estado a medias.
+bool Game::Sf_HasScreenSizeOverride() const
+{
+    const AbiLayout &abi = Abi();
+    return abi.sfForceScreenSizeOverride    != kAbiUnknown
+        && abi.sfOnScreenSizeChanged        != kAbiUnknown
+        && abi.sfIsScreenSizeOverrideActive != kAbiUnknown
+        && abi.sfGetScreenSize              != kAbiUnknown;
+}
+
 void Game::Rc_SetRenderTarget(IMatRenderContext *rc, ITexture *tex)
 {
     if (!rc) return;
@@ -501,12 +665,12 @@ char *Game::getNetworkName(uintptr_t *entity)
 
 void Game::ClientCmd(const char *szCmdString)
 {
-    m_EngineClient->ClientCmd(szCmdString);
+    Ec_ClientCmd(szCmdString);
 }
 
 void Game::ClientCmd_Unrestricted(const char *szCmdString)
 {
-    m_EngineClient->ClientCmd_Unrestricted(szCmdString);
+    Ec_ClientCmdUnrestricted(szCmdString);
 }
 
 

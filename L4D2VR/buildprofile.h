@@ -72,6 +72,35 @@ struct AbiLayout
     // que escribir en el offset de retail cae fuera de la asignacion.
     int msIsGameRunning = -1;
 
+    // --- IVEngineClient: indices de vtable ---
+    //
+    // corehub y 852_6 exponen los dos VEngineClient013 y aun asi la vtable NO
+    // es la misma: corehub tiene un metodo insertado en el slot 14, asi que
+    // desde ahi va corrido +1. IsInGame en particular lo llama DXVK una vez
+    // por frame desde el hilo de render, y por el indice equivocado se termina
+    // llamando otra funcion que espera un puntero.
+    int ecClientCmd             = kAbiCxx;
+    int ecClientCmdUnrestricted = kAbiCxx;
+    int ecGetLocalPlayer        = kAbiCxx;
+    int ecGetViewAngles         = kAbiCxx;
+    int ecSetViewAngles         = kAbiCxx;
+    int ecIsInGame              = kAbiCxx;
+
+    // --- ISurface (vguimatsurface): indices de vtable ---
+    //
+    // IsCursorVisible se llama una vez por frame. Por el indice equivocado en
+    // corehub caia en un "mov al,1; ret 8": ese ret 8 limpia 8 bytes que el
+    // llamador nunca puso, y el chequeo /GS del llamador termina abortando el
+    // proceso con STATUS_STACK_BUFFER_OVERRUN, lejos de la causa.
+    //
+    // corehub tiene ~90 slots contra los ~186 de 852_6: varios metodos de esta
+    // interfaz directamente no existen en 2009.
+    int sfIsCursorVisible            = kAbiCxx;
+    int sfGetScreenSize              = kAbiCxx;
+    int sfForceScreenSizeOverride    = kAbiCxx;
+    int sfOnScreenSizeChanged        = kAbiCxx;
+    int sfIsScreenSizeOverrideActive = kAbiCxx;
+
     // --- IMatRenderContext: indices de vtable ---
     // Solo los que el codigo vivo llama. El resto de las llamadas del mod
     // estan comentadas y no hace falta mapearlas.

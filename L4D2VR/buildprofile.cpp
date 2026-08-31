@@ -103,7 +103,7 @@ static const OffsetDef kBuild852_6[] = {
 //   Ninguna firma de 852_6 sirve aca, hay que derivarlas de cero.
 static const OffsetDef kBuild852_0[] = {
     { "GetFullScreenTexture", "client.dll", 0, "", 0 },  // TODO Fase E
-    { "RenderView", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "RenderView", "client.dll", 0x165270, "56 8B F1 6A 00 8D 8E ? ? ? ? E8 ? ? ? ? 6A 00 8D 8E ? ? ? ? E8 ? ? ? ?", 0 },  // RTTI CViewRender[3]; el patron corto matchea 2 veces
     { "g_pClientMode", "client.dll", 0, "", 2 },  // TODO Fase E
     { "CalcViewModelView", "client.dll", 0, "", 0 },  // TODO Fase E
     { "CreateMove", "client.dll", 0, "", 0 },  // TODO Fase E
@@ -114,8 +114,8 @@ static const OffsetDef kBuild852_0[] = {
     { "ProcessUsercmds", "server.dll", 0, "", 0 },  // TODO Fase E
     { "CBaseEntity_entindex", "server.dll", 0, "", 0 },  // TODO Fase E
     { "EyePosition", "server.dll", 0, "", 0 },  // TODO Fase E
-    { "PushRenderTargetAndViewport", "materialsystem.dll", 0, "", 0 },  // TODO Fase E
-    { "PopRenderTargetAndViewport", "materialsystem.dll", 0, "", 0 },  // TODO Fase E
+    { "PushRenderTargetAndViewport", "materialsystem.dll", 0x27DF0, "83 EC 24 8B 44 24 ? 8B 54 24 ? 89 04 24 33 C0 56 8B F1", 0 },  // CMatRenderContext[104], el overload de 6 args
+    { "PopRenderTargetAndViewport", "materialsystem.dll", 0x276F0, "56 8B F1 83 7E 50 00 74 ? 8B 06 8B 50 10", 0 },  // CMatRenderContext[108]; retail usa +0x4C, aca +0x50
     { "TraceFirePortalServer", "server.dll", 0, "", 0 },  // TODO Fase E
     { "CWeaponPortalgun_FirePortal", "server.dll", 0, "", 0 },  // TODO Fase E
     { "VGui_Paint", "engine.dll", 0, "", 0 },  // TODO Fase E
@@ -200,7 +200,47 @@ static constexpr AbiLayout AbiBuild852_0()
     a.msRenderContextEmbedded  = 0x2264;
     a.msRenderContextVtableRva = 0x943C4;
 
-    a.msIsGameRunning = -1;      // no identificado, y no hace falta
+    // Identificado decompilando BeginRenderTargetAllocation, que se autoidentifica
+    // por su Warning "Tried BeginRenderTargetAllocation after game startup":
+    //
+    //   if (this[0x2a88] == 0) { this[0x2a84]++; ... } else { Warning(...); }
+    //
+    // y CreateNamedRenderTargetTextureEx devuelve NULL si this[0x2a84] == 0.
+    // O sea que sin bajar este flag no se puede asignar ningun render target
+    // despues del arranque, que es exactamente para lo que el mod lo usa.
+    a.msIsGameRunning = 0x2A88;  // retail 0x2BB0
+
+    // IVEngineClient. corehub tiene un metodo insertado en el slot 14, asi que
+    // de ahi en adelante va corrido +1 contra retail. Verificado decompilando:
+    // el slot 20 contiene el literal
+    //   "CEngineClient::SetViewAngles:  rejecting invalid value [%f %f %f]"
+    // y el 26 hace return state[0x68] == 6, o sea SIGNONSTATE_FULL.
+    a.ecClientCmd      = 7;      // igual que retail
+    a.ecGetLocalPlayer = 12;     // igual que retail
+    a.ecGetViewAngles  = 19;     // retail 18
+    a.ecSetViewAngles  = 20;     // retail 19
+    a.ecIsInGame       = 26;     // retail 25
+
+    // Retail lo tiene en 108, casi 90 slots despues del ultimo corrimiento
+    // verificado. No se puede extrapolar el +1 hasta ahi: entre medio puede
+    // haber mas inserciones. Solo lo usan los bindings de los controles.
+    a.ecClientCmdUnrestricted = kAbiUnknown;
+
+    // ISurface. CMatSystemSurface va corrido -2 contra 852_6, verificado
+    // comparando las shapes de los slots 40-43 y 54-58.
+    a.sfIsCursorVisible = 54;   // retail 56
+    a.sfGetScreenSize   = 40;   // retail 42
+
+    // Retail los tiene en 114/133/139, y la vtable de corehub tiene ~90 slots:
+    // el override de tamano de pantalla no existe en este build. Los tres se
+    // usan juntos en VR::SetScreenSizeOverride, que queda como no-op.
+    a.sfForceScreenSizeOverride    = kAbiUnknown;
+    a.sfOnScreenSizeChanged        = kAbiUnknown;
+    a.sfIsScreenSizeOverrideActive = kAbiUnknown;
+
+    // IInput (CInputWin32) no necesita entradas: las vtables de corehub y 852_6
+    // coinciden byte a byte en los slots que usa el mod (SetCursorPos 7,
+    // InternalMouseWheeled 71).
 
     // IMatRenderContext.
     a.rcRelease         = 1;     // heredado de IRefCounted

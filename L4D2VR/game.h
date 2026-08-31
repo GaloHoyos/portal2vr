@@ -127,6 +127,25 @@ public:
     // No hace nada si el perfil no ubica isGameRunning en este build.
     void        MatSys_SetGameRunning(bool running);
 
+    // IVEngineClient. Ec_IsInGame la llama DXVK una vez por frame desde el
+    // hilo de render, asi que el indice tiene que ser el de este build.
+    void Ec_ClientCmd(const char *cmd);
+    void Ec_ClientCmdUnrestricted(const char *cmd);
+    int  Ec_GetLocalPlayer();
+    void Ec_GetViewAngles(QAngle &angles);
+    void Ec_SetViewAngles(QAngle &angles);
+    bool Ec_IsInGame();
+
+    // ISurface. Sf_IsCursorVisible se llama una vez por frame, asi que el
+    // indice tiene que ser el de este build.
+    bool Sf_IsCursorVisible();
+    void Sf_GetScreenSize(int &wide, int &tall);
+    void Sf_ForceScreenSizeOverride(bool state, int wide, int tall);
+    void Sf_OnScreenSizeChanged(int oldWide, int oldTall);
+    bool Sf_IsScreenSizeOverrideActive();
+    // false cuando el build no expone el override de tamano de pantalla.
+    bool Sf_HasScreenSizeOverride() const;
+
     void Rc_SetRenderTarget(IMatRenderContext *rc, ITexture *tex);
     void Rc_ClearBuffers(IMatRenderContext *rc, bool color, bool depth, bool stencil);
     void Rc_ClearColor4ub(IMatRenderContext *rc, unsigned char r, unsigned char g,

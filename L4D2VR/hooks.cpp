@@ -221,7 +221,7 @@ void __fastcall Hooks::dRenderView(void *ecx, void *edx, CViewSetup &setup, CVie
 		m_VR->CreateVRTextures();
 	}
 
-	if (m_Game->m_VguiSurface->IsCursorVisible())
+	if (m_Game->Sf_IsCursorVisible())
 		return hkRenderView.fOriginal(ecx, setup, hudViewSetup, nClearFlags, whatToDraw);
 
 	//VPanel* g_pFullscreenRootPanel = *(VPanel**)(m_Game->m_Offsets->g_pFullscreenRootPanel.address);
@@ -259,7 +259,7 @@ void __fastcall Hooks::dRenderView(void *ecx, void *edx, CViewSetup &setup, CVie
 
 	Vector hmdAngle = m_VR->GetViewAngle();
 	QAngle inGameAngle(hmdAngle.x, hmdAngle.y, hmdAngle.z);
-	m_Game->m_EngineClient->SetViewAngles(inGameAngle);
+	m_Game->Ec_SetViewAngles(inGameAngle);
 
 	float aspect = setup.m_flAspectRatio;
 
@@ -279,7 +279,7 @@ void __fastcall Hooks::dRenderView(void *ecx, void *edx, CViewSetup &setup, CVie
 	CViewSetup leftEyeView = setup;
 	CViewSetup rightEyeView = setup;
 
-	int playerIndex = m_Game->m_EngineClient->GetLocalPlayer();
+	int playerIndex = m_Game->Ec_GetLocalPlayer();
 	C_BasePlayer* localPlayer = (C_BasePlayer*)m_Game->GetClientEntity(playerIndex);
 
 	// Left eye CViewSetup
@@ -598,7 +598,7 @@ void Hooks::dPopRenderTargetAndViewport(void *ecx, void *edx)
 
 void Hooks::dVGui_Paint(void *ecx, void *edx, int mode)
 {
-	if (!m_VR->m_CreatedVRTextures || m_VR->m_Game->m_VguiSurface->IsCursorVisible())
+	if (!m_VR->m_CreatedVRTextures || m_VR->m_Game->Sf_IsCursorVisible())
 		return hkVgui_Paint.fOriginal(ecx, mode);
 
 	//std::cout << "dVGui_Paint\n";
@@ -639,7 +639,7 @@ Vector* Hooks::dWeapon_ShootPosition(void* ecx, void* edx, Vector* eyePos)
 {
 	Vector* result = hkWeapon_ShootPosition.fOriginal(ecx, eyePos);
 
-	int localIndex = m_Game->m_EngineClient->GetLocalPlayer();
+	int localIndex = m_Game->Ec_GetLocalPlayer();
 	int index = EntityIndex(ecx);
 
 	auto vrPlayer = m_Game->m_PlayersVRInfo[index];
@@ -674,7 +674,7 @@ bool __fastcall Hooks::dTraceFirePortal(void* ecx, void* edx, const Vector& vTra
 	Vector vNewDirection = vDirection;
 
 	if (iPlacedBy == 2) {
-		int localIndex = m_Game->m_EngineClient->GetLocalPlayer();
+		int localIndex = m_Game->Ec_GetLocalPlayer();
 
 		auto owner = GetOwner(ecx);
 
@@ -705,12 +705,12 @@ void __fastcall Hooks::dPlayerPortalled(void* ecx, void* edx, void* a2, __int64 
 	CBaseEntity* pBaseEntity = (CBaseEntity*)ecx;
 
 	QAngle angAbsRotationBefore;
-	m_Game->m_EngineClient->GetViewAngles(angAbsRotationBefore);
+	m_Game->Ec_GetViewAngles(angAbsRotationBefore);
 
 	hkPlayerPortalled.fOriginal(ecx, a2, a3);
 
 	QAngle angAbsRotationAfter;
-	m_Game->m_EngineClient->GetViewAngles(angAbsRotationAfter);
+	m_Game->Ec_GetViewAngles(angAbsRotationAfter);
 
 	if (angAbsRotationBefore != angAbsRotationAfter) {
 		m_VR->m_PortalRotationOffset = angAbsRotationAfter - angAbsRotationBefore;
@@ -743,7 +743,7 @@ bool Hooks::ScreenTransform(const Vector& point, Vector* pScreen, int width, int
 int __fastcall Hooks::dDrawSelf(void* ecx, void* edx, int x, int y, int w, int h, const void* clr, float flApparentZ) {
 	//std::cout << "dDrawSelf - X: " << x << ", Y: " << y << ", W: " << w << ", H: " << h << ", Z: " << flApparentZ << "\n";
 
-	//int playerIndex = m_Game->m_EngineClient->GetLocalPlayer();
+	//int playerIndex = m_Game->Ec_GetLocalPlayer();
 
 	//auto viewport = m_Game->m_ClientMode->GetViewport();
 
@@ -774,7 +774,7 @@ int __fastcall Hooks::dDrawSelf(void* ecx, void* edx, int x, int y, int w, int h
 }
 
 void __cdecl Hooks::dVGui_GetHudBounds(int slot, int& x, int& y, int& w, int& h) {
-	if (m_VR->m_IsVREnabled && !m_Game->m_VguiSurface->IsCursorVisible())
+	if (m_VR->m_IsVREnabled && !m_Game->Sf_IsCursorVisible())
 	{
 		x = y = 0;
 		w = m_VR->m_RenderWidth;
@@ -787,7 +787,7 @@ void __cdecl Hooks::dVGui_GetHudBounds(int slot, int& x, int& y, int& w, int& h)
 }
 
 void __cdecl Hooks::dVGui_GetPanelBounds(int slot, int& x, int& y, int& w, int& h) {
-	if (m_VR->m_IsVREnabled && !m_Game->m_VguiSurface->IsCursorVisible())
+	if (m_VR->m_IsVREnabled && !m_Game->Sf_IsCursorVisible())
 	{
 		x = y = 0;
 		w = m_VR->m_RenderWidth;
@@ -905,7 +905,7 @@ void __fastcall Hooks::dRotateObject(void* ecx, void* edx, void* pPlayer, float 
 // This works for release, but why was it crashing before??? TODO: buy a c++ book...
 QAngle& __fastcall Hooks::dEyeAngles(void* ecx, void* edx) {
 	if (m_VR->m_OverrideEyeAngles) {
-		int localIndex = m_Game->m_EngineClient->GetLocalPlayer();
+		int localIndex = m_Game->Ec_GetLocalPlayer();
 		int index = EntityIndex(ecx);
 
 		auto& vrPlayer = m_Game->m_PlayersVRInfo[index];

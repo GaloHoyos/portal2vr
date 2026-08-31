@@ -119,6 +119,10 @@
       <ModuleDefinitionFile>$(SolutionDir)dxvk\src\d3d9\d3d9.def</ModuleDefinitionFile>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>openvr_api.lib;$(SolutionDir)dxvk\lib32\vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <!-- El Event Log da el offset dentro de d3d9.dll cuando el proceso muere.
+           Sin mapa ese numero no se puede convertir en una funcion, y hay que
+           adivinar entre vtables candidatas. Con mapa es una busqueda. -->
+      <GenerateMapFile>true</GenerateMapFile>
     </Link>
     <PostBuildEvent>
       <Command>copy /Y "$(OutDir)$(TargetName)$(TargetExt)" "$(P2VRDeployDir)\$(TargetName)$(TargetExt)"</Command>
