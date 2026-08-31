@@ -495,7 +495,11 @@ bool __fastcall Hooks::dCreateMove(void *ecx, void *edx, float flInputSampleTime
 
 	if (m_VR->m_IsVREnabled)
 	{
-		cmd->viewangles = m_VR->m_HmdAngAbs;
+		// Sin roll, por el mismo motivo que en dRenderView: el CalcView del
+		// engine baja el origen de vista siguiendo 17 * |sin(roll)| unidades.
+		// El roll se aplica solo en el CViewSetup de cada ojo, que es lo que
+		// controla el render.
+		cmd->viewangles = QAngle(m_VR->m_HmdAngAbs.x, m_VR->m_HmdAngAbs.y, 0.0f);
 
 		vr::InputAnalogActionData_t analogActionData;
 		if (m_VR->GetAnalogActionData(m_VR->m_ActionWalk, analogActionData)) {
@@ -555,6 +559,21 @@ bool __fastcall Hooks::dCreateMove(void *ecx, void *edx, float flInputSampleTime
 		}
 	}
 
+	// Dejar correr el original, DESPUES de nuestras modificaciones para que las
+	// vea. En corehub el enganche es ClientModeShared::CreateMove, que reenvia
+	// a C_BasePlayer::CreateMove, y ahi es donde el juego procesa la
+	// interaccion: sin esta llamada el boton de usar deja de hacer efecto,
+	// aunque el comando +use llegue igual al engine.
+	//
+	// Nuestras escrituras sobreviven: solo limpiamos los bits de movimiento de
+	// cmd->buttons, no el resto.
+	hkCreateMove.fOriginal(ecx, flInputSampleTime, cmd);
+
+	// Se devuelve false a proposito, ignorando lo que haya devuelto el original.
+	// CInput::CreateMove hace:
+	//     if (g_pClientMode->CreateMove(...))
+	//         engine->SetViewAngles(cmd->viewangles);
+	// y los angulos de vista los fija el mod por su cuenta en dRenderView.
 	return false;
 }
 
