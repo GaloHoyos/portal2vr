@@ -114,6 +114,11 @@ typedef bool(__thiscall* tTraceFirePortal)(void* thisptr, const Vector& vTraceSt
 
 typedef void(__thiscall* tPlayerPortalled)(void* thisptr, void* a2, __int64 a3);
 
+// Handler del user message "EntityPortalled". Es __cdecl y toma el bf_read del
+// mensaje, a diferencia de PlayerPortalled que es un metodo. Se ubica por el
+// string del mensaje, que es mucho mas estable entre builds que una firma.
+typedef void(__cdecl* tMsgEntityPortalled)(void* msg);
+
 typedef int(__thiscall* tGetModeHeight)(void* thisptr);
 typedef int(__thiscall* tDrawSelf)(void* thisptr, int x, int y, int w, int h, const void* clr, float flApparentZ);
 typedef bool(__cdecl* tClipTransform)(const Vector& point, Vector* pClip);
@@ -195,6 +200,7 @@ public:
 	static inline Hook<tDrawSelf> hkDrawSelf;
 	static inline Hook<tClipTransform> hkClipTransform;
 	static inline Hook<tPlayerPortalled> hkPlayerPortalled;
+	static inline Hook<tMsgEntityPortalled> hkMsgEntityPortalled;
 	static inline Hook<tVGui_GetHudBounds> hkVGui_GetHudBounds;
 	static inline Hook<tVGui_GetPanelBounds> hkVGui_GetPanelBounds;
 
@@ -271,6 +277,7 @@ public:
 
 	// Portalling angle fix
 	static void __fastcall dPlayerPortalled(void* ecx, void* edx, void* a2, __int64 a3);
+	static void __cdecl dMsgEntityPortalled(void* msg);
 
 	// Crosshair
 	static int __fastcall dGetModeHeight(void* ecx, void* edx);

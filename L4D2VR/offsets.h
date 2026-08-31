@@ -49,6 +49,7 @@ public:
     Offset CWeaponPortalgun_FirePortal;
     Offset VGui_Paint;
     Offset PlayerPortalled;
+    Offset MsgFunc_EntityPortalled;
     Offset DrawSelf;
     Offset ClipTransform;
     Offset VGui_GetClientDLLRootPanel;
@@ -97,6 +98,7 @@ public:
         P2VR_RESOLVE(CWeaponPortalgun_FirePortal);
         P2VR_RESOLVE(VGui_Paint);
         P2VR_RESOLVE(PlayerPortalled);
+        P2VR_RESOLVE(MsgFunc_EntityPortalled);
         P2VR_RESOLVE(DrawSelf);
         P2VR_RESOLVE(ClipTransform);
         P2VR_RESOLVE(VGui_GetClientDLLRootPanel);

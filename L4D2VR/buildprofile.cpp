@@ -21,6 +21,7 @@ static const OffsetDef kRetail2011[] = {
     { "CWeaponPortalgun_FirePortal", "server.dll", 0x401370, "53 8B DC 83 EC 08 83 E4 F0 83 C4 04 55 8B 6B 04 89 6C 24 04 8B EC 81 EC ? ? ? ? 56 57 8B F9 89 7D EC E8 ? ? ? ?", 0 },
     { "VGui_Paint", "engine.dll", 0x115CE0, "55 8B EC E8 ? ? ? ? 8B 10 8B C8 8B 52 38", 0 },
     { "PlayerPortalled", "client.dll", 0x27C9D0, "55 8B EC 83 EC 78 53 56 8B D9 8B 0D ? ? ? ? 8B 01 8B 90 ? ? ? ? 57 33 FF 57 FF D2", 0 },
+    { "MsgFunc_EntityPortalled", "client.dll", 0, "", 0 },  // sin derivar: retail ya usa PlayerPortalled
     { "DrawSelf", "client.dll", 0x12CC90, "55 8B EC 56 8B F1 80 BE ? ? ? ? ? 0F 84 ? ? ? ? 8B 0D", 0 },
     { "ClipTransform", "client.dll", 0x1DD130, "55 8B EC 8B 0D ? ? ? ? 8B 01 8B 90 ? ? ? ? FF D2 8B 4D", 0 },
     { "VGui_GetClientDLLRootPanel", "client.dll", 0x26EDF0, "8B 0D ? ? ? ? 8B 01 8B 90 ? ? ? ? FF D2 8B 04 85 ? ? ? ? 8B 48 04", 0 },
@@ -70,6 +71,7 @@ static const OffsetDef kBuild852_6[] = {
     { "CWeaponPortalgun_FirePortal", "server.dll", 0, "", 0 },  // TODO portar
     { "VGui_Paint", "engine.dll", 0, "", 0 },  // TODO portar
     { "PlayerPortalled", "client.dll", 0, "", 0 },  // TODO portar
+    { "MsgFunc_EntityPortalled", "client.dll", 0, "", 0 },  // TODO: el string existe pero el registro no usa push
     { "DrawSelf", "client.dll", 0, "", 0 },  // TODO portar
     { "ClipTransform", "client.dll", 0, "", 0 },  // TODO portar
     { "VGui_GetClientDLLRootPanel", "client.dll", 0, "", 0 },  // TODO portar
@@ -120,6 +122,7 @@ static const OffsetDef kBuild852_0[] = {
     { "CWeaponPortalgun_FirePortal", "server.dll", 0, "", 0 },  // TODO Fase E
     { "VGui_Paint", "engine.dll", 0, "", 0 },  // TODO Fase E
     { "PlayerPortalled", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "MsgFunc_EntityPortalled", "client.dll", 0x1D4BD0, "81 EC ? ? ? ? 53 55 56 8B B4 24 ? ? ? ? 8B 4E 14 33 DB 83 F9 20", 0 },  // handler del user message, ubicado por HookMessage("EntityPortalled", handler)
     { "DrawSelf", "client.dll", 0, "", 0 },  // TODO Fase E
     { "ClipTransform", "client.dll", 0, "", 0 },  // TODO Fase E
     { "VGui_GetClientDLLRootPanel", "client.dll", 0, "", 0 },  // TODO Fase E

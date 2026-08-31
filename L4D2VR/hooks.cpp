@@ -42,6 +42,7 @@ Hooks::Hooks(Game *game)
 
 	hkDrawSelf.enableHook();
 	hkPlayerPortalled.enableHook();
+	hkMsgEntityPortalled.enableHook();
 
 	//hkComputeError.enableHook();
 	hkUpdateObject.enableHook();
@@ -140,6 +141,7 @@ int Hooks::initSourceHooks()
 
 	// Portalling
 	LPVOID PlayerPortalledAddr = (LPVOID)(m_Game->m_Offsets->PlayerPortalled.address);
+	hkMsgEntityPortalled.createHook((LPVOID)m_Game->m_Offsets->MsgFunc_EntityPortalled.address, &dMsgEntityPortalled);
 	hkPlayerPortalled.createHook(PlayerPortalledAddr, &dPlayerPortalled);
 
 	UTIL_Portal_FirstAlongRay = (tUTIL_Portal_FirstAlongRay)m_Game->m_Offsets->UTIL_Portal_FirstAlongRay.address;
@@ -821,6 +823,41 @@ void __fastcall Hooks::dPlayerPortalled(void* ecx, void* edx, void* a2, __int64 
 	}
 
 	return;
+}
+
+// Misma idea que dPlayerPortalled, sobre el handler del user message
+// "EntityPortalled" en vez de sobre el metodo.
+//
+// El detour solo mide cuanto rota el engine los angulos de vista alrededor de
+// la llamada, asi que da igual cual de los dos se enganche mientras la rotacion
+// pase adentro. Y el handler se ubica por el string del mensaje
+// -- HookMessage("EntityPortalled", handler) deja el puntero al handler
+// empujado justo al lado --, que es un ancla mucho mas estable entre builds que
+// una firma de bytes.
+//
+// Sin esto, al cruzar un portal que te reorienta la camara se queda mirando
+// hacia donde mirabas antes: el mod pisa los angulos con los del visor en cada
+// frame, asi que la rotacion del engine se pierde si nadie la captura.
+void __cdecl Hooks::dMsgEntityPortalled(void* msg)
+{
+	QAngle before;
+	m_Game->Ec_GetViewAngles(before);
+
+	hkMsgEntityPortalled.fOriginal(msg);
+
+	QAngle after;
+	m_Game->Ec_GetViewAngles(after);
+
+	if (before != after) {
+		m_VR->m_PortalRotationOffset = after - before;
+		m_VR->m_ApplyPortalRotationOffset = true;
+
+		char m[128];
+		sprintf_s(m, "portal: rotacion %.1f,%.1f,%.1f",
+			m_VR->m_PortalRotationOffset.x, m_VR->m_PortalRotationOffset.y,
+			m_VR->m_PortalRotationOffset.z);
+		Game::LogInit(m, nullptr);
+	}
 }
 
 int Hooks::dGetModeHeight(void* ecx, void* edx) {
