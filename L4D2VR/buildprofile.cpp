@@ -292,10 +292,15 @@ static constexpr AbiLayout AbiBuild852_0()
     a.ecSetViewAngles  = 20;     // retail 19
     a.ecIsInGame       = 26;     // retail 25
 
-    // Retail lo tiene en 108, casi 90 slots despues del ultimo corrimiento
-    // verificado. No se puede extrapolar el +1 hasta ahi: entre medio puede
-    // haber mas inserciones. Solo lo usan los bindings de los controles.
-    a.ecClientCmdUnrestricted = kAbiUnknown;
+    // Verificado decompilando: es ClientCmd (slot 7) sin la envoltura de
+    // restriccion. ClientCmd empuja los marcadores 99 y 100 alrededor del
+    // comando si el flag state[0x49f5] esta puesto; este hace el mismo
+    // MakeStr + Exec del comando y del separador sin esos marcadores, y
+    // despues llama a Cbuf_Execute.
+    //
+    // El indice de retail (108) no servia: ese slot en este build es
+    // SetRestrictServerCommands, que toma un bool.
+    a.ecClientCmdUnrestricted = 105;   // retail 108
 
     // ISurface. CMatSystemSurface va corrido -2 contra 852_6, verificado
     // comparando las shapes de los slots 40-43 y 54-58.

@@ -428,6 +428,20 @@ void Game::Ec_ClientCmdUnrestricted(const char *cmd)
 {
     if (!m_EngineClient) return;
 
+    // Los primeros comandos quedan en el log. Sirve para confirmar desde afuera
+    // que los botones del control llegan al engine, sin tener que mirar la
+    // consola del juego mientras se tiene el visor puesto.
+    {
+        static int logged = 0;
+        if (logged < 12)
+        {
+            ++logged;
+            char m[128];
+            sprintf_s(m, "cmd: %s", cmd ? cmd : "(null)");
+            LogInit(m, nullptr);
+        }
+    }
+
     const int idx = Abi().ecClientCmdUnrestricted;
     if (idx == kAbiCxx) { m_EngineClient->ClientCmd_Unrestricted(cmd); return; }
     if (idx < 0)        { LogAbiSkipOnce("ABI sin identificar: Ec_ClientCmdUnrestricted"); return; }
