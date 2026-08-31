@@ -232,6 +232,11 @@ static constexpr AbiLayout AbiBuild852_6()
     a.rcClearColor4ub            = kAbiUnknown;
     a.rcOverrideAlphaWriteEnable = kAbiUnknown;
 
+    // Retail lo tiene en 108, pero ese slot en este build es un setter de un
+    // byte de estado (E8 <call>; mov cl,[esp+4]), o sea SetRestrictServerCommands.
+    // Pasarle un const char* a eso escribe basura. Se saltea hasta derivarlo.
+    a.ecClientCmdUnrestricted = kAbiUnknown;
+
     // ISurface: corehub esta -2 contra este build, y el 54 de corehub esta
     // verificado en runtime, asi que estos dos son los de retail.
     a.sfIsCursorVisible = 56;
