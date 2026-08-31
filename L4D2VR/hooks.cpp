@@ -322,7 +322,20 @@ void __fastcall Hooks::dRenderView(void *ecx, void *edx, CViewSetup &setup, CVie
 
 	RV_TRACE(5, "5: antes de GetViewAngle");
 	Vector hmdAngle = m_VR->GetViewAngle();
-	QAngle inGameAngle(hmdAngle.x, hmdAngle.y, hmdAngle.z);
+
+	// Los angulos de vista del *jugador* van sin roll.
+	//
+	// Source no espera roll ahi: al recibirlo, el CalcView del engine baja el
+	// origen de vista siguiendo 17 * |sin(roll)| unidades. Medido con
+	// P2VR_TRACKLOG manteniendo la cabeza a altura fija y solo inclinando: la
+	// posicion fisica del visor (m_HmdPosRelative.z) no se movia y la altura del
+	// ojo caia 12 unidades a 44 grados, simetrico para los dos lados. El
+	// coeficiente da 16.0-18.3 contra |sin| y 45-172 contra (1-cos), asi que es
+	// |sin| y no una rotacion de un offset vertical.
+	//
+	// El roll SI se conserva en el CViewSetup de cada ojo, que es lo que
+	// controla el render: la imagen sigue inclinandose con la cabeza.
+	QAngle inGameAngle(hmdAngle.x, hmdAngle.y, 0.0f);
 	m_Game->Ec_SetViewAngles(inGameAngle);
 	RV_TRACE(6, "6: SetViewAngles ok");
 

@@ -1159,8 +1159,10 @@ void VR::UpdateTracking()
             const Vector eyeL = GetViewOriginLeft(m_SetupOrigin);
             const Vector eyeR = GetViewOriginRight(m_SetupOrigin);
             char m[256];
+            // El roll que se reporta es el que se esta aplicando de verdad, que
+            // con P2VR_FAKEROLL no es el del visor.
             sprintf_s(m, "TRK ang p=%.1f y=%.1f r=%.1f | rel=%.2f,%.2f,%.2f | right=%.3f,%.3f,%.3f",
-                m_HmdAngAbs.x, m_HmdAngAbs.y, m_HmdAngAbs.z,
+                m_HmdAngAbs.x, m_HmdAngAbs.y, GetViewAngle().z,
                 m_HmdPosRelative.x, m_HmdPosRelative.y, m_HmdPosRelative.z,
                 m_HmdRight.x, m_HmdRight.y, m_HmdRight.z);
             Game::LogInit(m, nullptr);
@@ -1296,6 +1298,23 @@ void VR::UpdateTracking()
 
 Vector VR::GetViewAngle()
 {
+    // P2VR_FAKEROLL=1 hace oscilar el roll entre -45 y +45 grados sin tocar el
+    // visor. Sirve para reproducir en el escritorio los problemas que solo
+    // aparecen al inclinar la cabeza, sin depender de que alguien se lo ponga.
+    static int s_fake = -1;
+    if (s_fake < 0)
+    {
+        char v[8]; size_t n = 0;
+        s_fake = (getenv_s(&n, v, sizeof(v), "P2VR_FAKEROLL") == 0 && n > 1) ? 1 : 0;
+    }
+    if (s_fake)
+    {
+        // En funcion del reloj, no de la cantidad de llamadas: asi consultarlo
+        // dos veces en el mismo frame (por ejemplo desde la traza) da lo mismo.
+        const float roll = 45.0f * sinf((float)GetTickCount() * 0.0015f);
+        return Vector(m_HmdAngAbs.x, m_HmdAngAbs.y, roll);
+    }
+
     return Vector( m_HmdAngAbs.x, m_HmdAngAbs.y, m_HmdAngAbs.z );
 }
 
