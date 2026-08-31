@@ -24,12 +24,18 @@ class bf_read;
 
 template <typename T>
 struct Hook {
-	T fOriginal;
-	LPVOID pTarget;
-	bool isEnabled;
+	T fOriginal    = nullptr;
+	LPVOID pTarget = nullptr;
+	bool isEnabled = false;
 
+	// Un offset sin portar llega aca como nullptr. En vez de abrir un dialogo y
+	// dejar pTarget invalido (para despues explotar en enableHook), lo salteamos:
+	// el mod corre con los hooks que si pudo resolver.
 	int createHook(LPVOID targetFunc, LPVOID detourFunc)
 	{
+		if (!targetFunc)
+			return 1;
+
 		if (MH_CreateHook(targetFunc, detourFunc, reinterpret_cast<LPVOID *>(&fOriginal)) != MH_OK)
 		{
 			char errorString[512];
@@ -38,12 +44,13 @@ struct Hook {
 			return 1;
 		}
 		pTarget = targetFunc;
+		return 0;
 	}
 
 	int enableHook()
 	{
 		if (!pTarget)
-			throw std::invalid_argument("pTarget is empty, did you miss a call to createHook?");
+			return 1;   // nunca se creo: no es un error fatal
 
 		MH_STATUS status = MH_EnableHook(pTarget);
 		if (status != MH_OK)
@@ -54,16 +61,21 @@ struct Hook {
 			return 1;
 		}
 		isEnabled = true;
+		return 0;
 	}
 
 	int disableHook()
 	{
+		if (!pTarget)
+			return 1;
+
 		if (MH_DisableHook(pTarget) != MH_OK)
 		{
 			Game::errorMsg("Failed to disable hook");
 			return 1;
 		}
 		isEnabled = false;
+		return 0;
 	}
 };
 
