@@ -225,6 +225,36 @@ void VR::Update()
     {
         bool inGame = m_Game->Ec_IsInGame();
 
+        // Recentrar al entrar a una partida.
+        //
+        // m_Center se tomaba una sola vez, al construir VR, cuando el visor
+        // puede estar en cualquier lado: apoyado en el escritorio, en la mano,
+        // a media altura. Y como toda la posicion es (HMD - m_Center) * VRScale,
+        // esa diferencia queda sumada para siempre. Medido con P2VR_TRACKLOG:
+        // dejaba m_HmdPosRelative.z en ~48 unidades de Source con la cabeza
+        // quieta, cuando deberia rondar 0. La altura de ojos de Portal 2 es 64,
+        // asi que la camara quedaba a ~113: el jugador flotando al doble de
+        // altura, con todo el mundo viendose chico y lejano.
+        //
+        // Al entrar al mapa el visor ya esta puesto, que es el momento correcto
+        // para tomar la referencia. Se sigue pudiendo recentrar a mano con el
+        // click del joystick izquierdo.
+        static bool s_wasInGame = false;
+        if (inGame && !s_wasInGame)
+        {
+            // Si todavia no llego una pose valida, m_HmdPose esta en cero y
+            // recentrar ahi seria peor que no hacerlo.
+            const Vector &p = m_HmdPose.TrackedDevicePos;
+            if (p.x != 0.0f || p.y != 0.0f || p.z != 0.0f)
+            {
+                ResetPosition();
+                char m[96];
+                sprintf_s(m, "recentrado al entrar a partida: centro z=%.3f m", m_Center.z);
+                Game::LogInit(m, nullptr);
+            }
+        }
+        s_wasInGame = inGame;
+
         //SetScreenSizeOverride(inGame);
 
         // Prevents crashing at menu
