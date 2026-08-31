@@ -244,16 +244,22 @@ void VR::Update()
 
     // Traza de una sola pasada: marca cual de estas etapas es la ultima que se
     // registra antes de que el proceso termine.
-    static bool s_traced = false;
-    const bool trace = !s_traced;
+    // Traza por pasada, no de una sola vez: la pasada 1 toma el camino de la
+    // textura en blanco y la 2 el del estereo, asi que son caminos distintos y
+    // trazar solo la primera deja la segunda a oscuras.
+    static int s_pass = 0;
+    ++s_pass;
+    const bool trace = s_pass <= 8;
+    char um[96];
+    #define UP_TRACE(what) do { if (trace) { sprintf_s(um, "Update p%d: " what, s_pass); Game::LogInit(um, nullptr); } } while (0)
 
-    if (trace) Game::LogInit("Update: antes de SubmitVRTextures", (void *)1);
+    UP_TRACE("antes de SubmitVRTextures");
     SubmitVRTextures();
-    if (trace) Game::LogInit("Update: antes de UpdatePosesAndActions", (void *)1);
+    UP_TRACE("antes de UpdatePosesAndActions");
     UpdatePosesAndActions();
-    if (trace) Game::LogInit("Update: antes de UpdateTracking", (void *)1);
+    UP_TRACE("antes de UpdateTracking");
     UpdateTracking();
-    if (trace) Game::LogInit("Update: antes de ProcessInput", (void *)1);
+    UP_TRACE("antes de ProcessInput");
 
     if (m_Game->Sf_IsCursorVisible()) {
         ProcessMenuInput();
@@ -261,7 +267,8 @@ void VR::Update()
         ProcessInput();
     }
 
-    if (trace) { Game::LogInit("Update: primer frame completo", (void *)1); s_traced = true; }
+    UP_TRACE("frame completo");
+    #undef UP_TRACE
 }
 
 void VR::CreateVRTextures()
@@ -354,12 +361,51 @@ void VR::SubmitVRTextures()
 
         //if (!m_Game->Ec_IsInGame())
         {
-            vr::VRCompositor()->Submit(vr::Eye_Left, &m_VKBlankTexture.m_VRTexture, NULL, vr::Submit_Default);
-            vr::VRCompositor()->Submit(vr::Eye_Right, &m_VKBlankTexture.m_VRTexture, NULL, vr::Submit_Default);
+            const vr::EVRCompositorError bl =
+                vr::VRCompositor()->Submit(vr::Eye_Left, &m_VKBlankTexture.m_VRTexture, NULL, vr::Submit_Default);
+            const vr::EVRCompositorError br =
+                vr::VRCompositor()->Submit(vr::Eye_Right, &m_VKBlankTexture.m_VRTexture, NULL, vr::Submit_Default);
+
+            static vr::EVRCompositorError lastBl = (vr::EVRCompositorError)-1;
+            if (bl != lastBl || br != lastBl)
+            {
+                lastBl = bl;
+                char m[160];
+                sprintf_s(m, "Submit blank: izq=%d  der=%d  (0 = OK)", (int)bl, (int)br);
+                Game::LogInit(m, nullptr);
+            }
         }
 
         return;
     }
+    // Una sola vez: que le estamos pasando realmente al compositor. Si la
+    // imagen de un ojo viene en cero, DXVK no lleno ese holder y el submit de
+    // ese ojo es basura.
+    {
+        static bool s_logged = false;
+        if (!s_logged)
+        {
+            s_logged = true;
+            char m[224];
+            sprintf_s(m, "eye L: img=%llu fmt=%u %ux%u sample=%u | bounds u=%.2f..%.2f v=%.2f..%.2f",
+                (unsigned long long)m_VKLeftEye.m_VulkanData.m_nImage,
+                m_VKLeftEye.m_VulkanData.m_nFormat,
+                m_VKLeftEye.m_VulkanData.m_nWidth, m_VKLeftEye.m_VulkanData.m_nHeight,
+                m_VKLeftEye.m_VulkanData.m_nSampleCount,
+                m_TextureBounds[0].uMin, m_TextureBounds[0].uMax,
+                m_TextureBounds[0].vMin, m_TextureBounds[0].vMax);
+            Game::LogInit(m, nullptr);
+            sprintf_s(m, "eye R: img=%llu fmt=%u %ux%u sample=%u | bounds u=%.2f..%.2f v=%.2f..%.2f",
+                (unsigned long long)m_VKRightEye.m_VulkanData.m_nImage,
+                m_VKRightEye.m_VulkanData.m_nFormat,
+                m_VKRightEye.m_VulkanData.m_nWidth, m_VKRightEye.m_VulkanData.m_nHeight,
+                m_VKRightEye.m_VulkanData.m_nSampleCount,
+                m_TextureBounds[1].uMin, m_TextureBounds[1].uMax,
+                m_TextureBounds[1].vMin, m_TextureBounds[1].vMax);
+            Game::LogInit(m, nullptr);
+        }
+    }
+
     vr::VROverlay()->HideOverlay(m_MainMenuHandle);
 
     //vr::VROverlay()->SetOverlayTexture(m_HUDHandle, &m_VKHUD.m_VRTexture);
@@ -370,8 +416,26 @@ void VR::SubmitVRTextures()
         //vr::VROverlay()->ShowOverlay(m_HUDHandle);
     }
 
-    vr::VRCompositor()->Submit(vr::Eye_Left, &m_VKLeftEye.m_VRTexture, &(m_TextureBounds)[0], vr::Submit_Default);
-    vr::VRCompositor()->Submit(vr::Eye_Right, &m_VKRightEye.m_VRTexture, &(m_TextureBounds)[1], vr::Submit_Default);
+    // El codigo de error del compositor se descartaba. Un submit invalido no
+    // devuelve error visible en ningun otro lado: SteamVR simplemente termina
+    // la aplicacion, que desde afuera se ve como una salida limpia del juego.
+    // Se registra el primer error de cada ojo, y despues solo si cambia.
+    {
+        const vr::EVRCompositorError l =
+            vr::VRCompositor()->Submit(vr::Eye_Left, &m_VKLeftEye.m_VRTexture, &(m_TextureBounds)[0], vr::Submit_Default);
+        const vr::EVRCompositorError r =
+            vr::VRCompositor()->Submit(vr::Eye_Right, &m_VKRightEye.m_VRTexture, &(m_TextureBounds)[1], vr::Submit_Default);
+
+        static vr::EVRCompositorError lastL = (vr::EVRCompositorError)-1;
+        static vr::EVRCompositorError lastR = (vr::EVRCompositorError)-1;
+        if (l != lastL || r != lastR)
+        {
+            lastL = l; lastR = r;
+            char m[160];
+            sprintf_s(m, "Submit: ojo izq=%d  ojo der=%d  (0 = OK)", (int)l, (int)r);
+            Game::LogInit(m, nullptr);
+        }
+    }
 
     m_RenderedNewFrame = false;
 }
@@ -1522,6 +1586,18 @@ void VR::ParseConfigFile()
     parseOrDefault("HudSize", m_HudSize, 4.0f);
     parseOrDefault("HudAlwaysVisible", m_HudAlwaysVisible, false);*/
     parseOrDefault("AimMode", m_AimMode, 2);
+
+    // El laser sight saca el arma activa por vtable[242] de C_Portal_Player y
+    // despues usa offsets de struct de C_Portal_Player y CWeaponPortalBase,
+    // todo con layout de retail. En un build donde eso no esta verificado, el
+    // efecto no se ve hasta entrar a una partida: el menu anda perfecto y el
+    // juego se cierra a los pocos segundos de cargar un mapa.
+    if (m_AimMode == 2 && m_Game->m_Offsets && m_Game->m_Offsets->profile
+        && !m_Game->m_Offsets->profile->abi.laserAimSupported)
+    {
+        m_AimMode = 0;
+        Game::LogInit("config: AimMode=2 no soportado en este build, se usa 0", nullptr);
+    }
     parseOrDefault("AntiAliasing", m_AntiAliasing, 0);
     parseOrDefault("RenderWindow", m_RenderWindow, 0);
     parseXYZOrDefaultZero("ViewmodelPosCustomOffset", m_ViewmodelPosCustomOffset);

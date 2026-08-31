@@ -224,8 +224,21 @@ void __fastcall Hooks::dRenderView(void *ecx, void *edx, CViewSetup &setup, CVie
 	// Traza de una sola pasada por etapa. Es la primera vez que el mod llega a
 	// ejecutar el cuerpo de RenderView en estos builds, asi que hasta aca todo
 	// es territorio nuevo.
+	// Contador de entradas, no de frames completos: si el proceso muere a mitad
+	// del frame N, este ya vale N y las trazas de abajo dicen hasta donde llego.
+	static int s_entry = 0;
+	++s_entry;
 	static int s_step = 0;
-	#define RV_TRACE(n, what) do { if (s_step < (n)) { s_step = (n); Game::LogInit("dRenderView " what, (void *)(intptr_t)(n)); } } while (0)
+
+	// Las trazas disparan en los primeros frames, no una sola vez. El primer
+	// frame completaba bien y la muerte era en el segundo, que con una traza de
+	// una sola pasada quedaba completamente a oscuras.
+	#define RV_TRACE(n, what) do { \
+		if (s_entry <= 3 && s_step != (n)) { \
+			s_step = (n); \
+			char rvm[128]; sprintf_s(rvm, "dRenderView f%d " what, s_entry); \
+			Game::LogInit(rvm, nullptr); \
+		} } while (0)
 
 	RV_TRACE(1, "1: texturas ok");
 
@@ -337,7 +350,7 @@ void __fastcall Hooks::dRenderView(void *ecx, void *edx, CViewSetup &setup, CVie
 
 	int playerIndex = m_Game->Ec_GetLocalPlayer();
 	C_BasePlayer* localPlayer = (C_BasePlayer*)m_Game->GetClientEntity(playerIndex);
-	if (s_step < 9) { char m[128]; sprintf_s(m, "9: playerIndex=%d localPlayer", playerIndex); Game::LogInit(m, localPlayer); s_step = 9; }
+	if (s_entry <= 3) { char m[128]; sprintf_s(m, "f%d 9: playerIndex=%d localPlayer", s_entry, playerIndex); Game::LogInit(m, localPlayer); s_step = 9; }
 
 	// Left eye CViewSetup
 	QAngle tempAngle = vsSetup.Angles();
@@ -365,6 +378,21 @@ void __fastcall Hooks::dRenderView(void *ecx, void *edx, CViewSetup &setup, CVie
 	m_Game->ReleaseRenderContext(rndrContext);
 	hkRenderView.fOriginal(ecx, rightEyeView, hudViewSetup, nClearFlags, whatToDraw);
 	RV_TRACE(14, "14: ojo der renderizado");
+
+	// Latido: las trazas de arriba son de una sola pasada, asi que solo cuentan
+	// el primer frame. Esto dice cuantos frames completos aguanto y si el ultimo
+	// quedo a medias (el log tiene flush por linea, o sea que sobrevive a la
+	// muerte del proceso).
+	{
+		static int s_frames = 0;
+		++s_frames;
+		if (s_frames <= 3 || (s_frames % 600) == 0)
+		{
+			char m[96];
+			sprintf_s(m, "dRenderView: %d frames completos", s_frames);
+			Game::LogInit(m, nullptr);
+		}
+	}
 
 	m_PushedHud = false;
 

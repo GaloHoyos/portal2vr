@@ -122,6 +122,12 @@ struct AbiLayout
     // -1 = el campo no existe en este build, y escribirlo es un no-op.
     ViewSetupLayout vs{};
 
+    // El laser sight (AimMode=2) llama vtable[242] de C_Portal_Player para
+    // sacar el arma activa, y despues usa offsets de struct de C_Portal_Player
+    // y CWeaponPortalBase. Todo con layout de retail, y solo se ejecuta dentro
+    // de una partida: en el menu no se nota. false = AimMode se fuerza a 0.
+    bool laserAimSupported = true;
+
     // --- ISurface (vguimatsurface): indices de vtable ---
     //
     // IsCursorVisible se llama una vez por frame. Por el indice equivocado en

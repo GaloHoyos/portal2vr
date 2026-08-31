@@ -239,6 +239,10 @@ static constexpr AbiLayout AbiBuild852_6()
     // vivo: si el estereo sale deformado aca, esto es lo primero que hay que
     // volcar (ver el bloque VS+ de dRenderView).
     a.vs = ViewSetupClassicSource();
+
+    // vtable[242] de C_Portal_Player no esta verificado en este build, y los
+    // offsets de C_Portal_Player y CWeaponPortalBase tampoco.
+    a.laserAimSupported = false;
     return a;
 }
 
@@ -297,6 +301,10 @@ static constexpr AbiLayout AbiBuild852_0()
     //   +0x58..+0x6C = 20/100/250/1000/10/5, los DoF por defecto, que marcan
     //   donde termina el bloque de zNear/zFar/aspect.
     a.vs = ViewSetupClassicSource();
+
+    // vtable[242] de C_Portal_Player no esta verificado en este build, y los
+    // offsets de C_Portal_Player y CWeaponPortalBase tampoco.
+    a.laserAimSupported = false;
 
     // Retail los tiene en 114/133/139, y la vtable de corehub tiene ~90 slots:
     // el override de tamano de pantalla no existe en este build. Los tres se
