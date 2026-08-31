@@ -172,14 +172,45 @@ static constexpr AbiLayout AbiBuild852_6()
     a.msRenderContextEmbedded  = 0x22B4;
     a.msRenderContextVtableRva = 0x9C974;
 
-    // No escribir isGameRunning. En retail vive en +0x2BB0, pero aca el render
-    // context embebido ya esta en +0x22B4, o sea que el struct termina mucho
-    // antes: escribir en el offset de retail cae fuera de la asignacion.
-    a.msIsGameRunning = -1;
+    // IMaterialSystem. Mismo patron que corehub: delta -2 hasta
+    // GetBackBufferFormat (SpewDriverInfo, retail 33, cae en 31) y -3 desde
+    // SupportsHDRMode (BeginFrame, retail 41, cae en 38). O sea que a este
+    // build tampoco le existe GetAspectRatioInfo, que es posterior a dic 2010.
+    a.msGetBackBufferFormat = 33;   // retail 35
+    // Y -4 en la zona de los render targets. El grupo se identifica por el
+    // conteo de parametros: [88] y [89] 0 params, [90] 5, [91] 8, [92] 8 con
+    // dos char (CreateNamedRenderTargetTexture) y [93] 8.
+    a.msBeginRenderTargetAllocation      = 88;   // retail 92
+    a.msEndRenderTargetAllocation        = 89;   // retail 93
+    a.msCreateNamedRenderTargetTextureEx = 91;   // retail 95
 
-    // El resto queda en kAbiCxx a proposito: es el comportamiento actual, y el
-    // objetivo de este cambio es arreglar la escritura fuera de rango sin mover
-    // nada mas, para que la puerta de no-regresion signifique algo.
+    // Esta era la causa del crash historico de este build. El mod llamaba el
+    // indice 92 creyendo que era BeginRenderTargetAllocation; en 852_6 el 92 es
+    // CreateNamedRenderTargetTexture, de ocho argumentos, invocada sin ninguno.
+    // "Completaba" y dejaba la pila rota, y el proceso moria despues.
+
+    // BeginRenderTargetAllocation decompilado se autoidentifica por su Warning
+    // y solo incrementa el contador si this[0x2b58] es 0.
+    a.msIsGameRunning = 0x2B58;   // retail 0x2BB0, corehub 0x2A88
+
+    // IMatRenderContext. SetRenderTarget y ClearBuffers coinciden en shape con
+    // los de corehub, que estan verificados por decompilacion.
+    a.rcRelease         = 1;
+    a.rcSetRenderTarget = 6;
+    a.rcClearBuffers    = 12;
+
+    // Sin derivar. Retail los tiene en 74 y 185, pero la vtable de este build
+    // esta corrida (Viewport 38 vs 39, Pop 109 vs 111) y no de forma uniforme,
+    // asi que el indice de retail no sirve. Se saltean: solo los usa el camino
+    // del HUD. Llamarlos por el indice equivocado corrompe la pila, que es
+    // justo el bug que costo mas caro encontrar en corehub.
+    a.rcClearColor4ub            = kAbiUnknown;
+    a.rcOverrideAlphaWriteEnable = kAbiUnknown;
+
+    // ISurface: corehub esta -2 contra este build, y el 54 de corehub esta
+    // verificado en runtime, asi que estos dos son los de retail.
+    a.sfIsCursorVisible = 56;
+    a.sfGetScreenSize   = 42;
     return a;
 }
 
