@@ -73,7 +73,9 @@ Game::Game()
     if (stageLimit <= 2) { m_Initialized = true; return; }
 
     m_ClientEntityList = (IClientEntityList *)GetInterface("client.dll", "VClientEntityList003");
-    m_EngineTrace = (IEngineTrace *)GetInterface("engine.dll", "EngineTraceClient004");
+    // corehub (852_0, jul 2009) expone EngineTraceClient003; retail y 852_6, 004.
+    m_EngineTrace = (IEngineTrace *)GetInterfaceAny("engine.dll",
+        { "EngineTraceClient004", "EngineTraceClient003" });
     // El build 852_6 (dic 2010) expone VEngineClient013, retail expone 015.
     // Los indices de vtable que usa el mod (ClientCmd 7, GetLocalPlayer 12,
     // GetViewAngles 18, SetViewAngles 19, IsInGame 25) son identicos en ambas,
@@ -171,12 +173,119 @@ void *Game::GetInterfaceAny(const char *dllname, std::initializer_list<const cha
 // el perfil del build indica el offset del contexto embebido (ver BuildProfile).
 // Ese camino NO incrementa el refcount, asi que el llamador no debe hacer
 // Release: usar ReleaseRenderContext, que sabe cual de los dos casos aplica.
+// --- Capa ABI ----------------------------------------------------------------
+//
+// Llamar un metodo virtual por el indice equivocado no falla: devuelve basura o
+// ejecuta otra cosa, y el crash aparece lejos del origen. Por eso ninguna
+// llamada a IMaterialSystem / IMatRenderContext se hace directo: todas pasan
+// por estos thunks, que consultan el perfil del build.
+
+namespace {
+
+// Toma el slot `index` de la vtable de `obj` y lo interpreta como Fn.
+template <typename Fn>
+inline Fn VFn(void *obj, int index)
+{
+    return (Fn)(*(void ***)obj)[index];
+}
+
+// Un metodo sin identificar se saltea, pero tiene que quedar registrado: si algo
+// se ve raro despues, el log dice que llamada no se hizo. Una vez por metodo.
+void LogAbiSkipOnce(const char *what)
+{
+    static const char *reported[16] = {};
+    static int count = 0;
+    for (int i = 0; i < count; ++i)
+        if (reported[i] == what) return;
+    if (count < (int)(sizeof(reported) / sizeof(reported[0])))
+        reported[count++] = what;
+    Game::LogInit(what, nullptr);
+}
+
+const AbiLayout kAbiDefault{};
+
+} // namespace
+
+const AbiLayout &Game::Abi() const
+{
+    if (m_Offsets && m_Offsets->profile)
+        return m_Offsets->profile->abi;
+    return kAbiDefault;   // antes de resolver offsets: comportamiento de retail
+}
+
+// Devuelve el offset del CMatRenderContext embebido dentro de CMaterialSystem, o
+// 0 si hay que usar la llamada virtual.
+//
+// El perfil puede dar el offset directo, el RVA de la vtable de
+// CMatRenderContext, o los dos. Con los dos se valida uno contra otro: es la
+// unica forma de enterarse de que el offset derivado estaticamente esta mal
+// *antes* de que el mod empiece a escribir a traves de ese puntero.
+int Game::ResolveEmbeddedRenderContextOffset()
+{
+    static int cached = -1;
+    if (cached >= 0)
+        return cached;
+
+    const AbiLayout &abi = Abi();
+    if (!m_MaterialSystem)
+        return 0;
+
+    uintptr_t wantVtable = 0;
+    if (abi.msRenderContextVtableRva != 0 && m_BaseMaterialSystem)
+        wantVtable = m_BaseMaterialSystem + (uintptr_t)abi.msRenderContextVtableRva;
+
+    if (abi.msRenderContextEmbedded != 0)
+    {
+        cached = abi.msRenderContextEmbedded;
+        if (wantVtable)
+        {
+            const uintptr_t got = *(uintptr_t *)((char *)m_MaterialSystem + cached);
+            LogInit(got == wantVtable ? "render context embebido: OK"
+                                      : "render context embebido: NO COINCIDE",
+                    (void *)(uintptr_t)cached);
+        }
+        return cached;
+    }
+
+    if (!wantVtable)
+    {
+        cached = 0;
+        return 0;
+    }
+
+    // Buscarlo. El objeto vive en el heap, asi que se acota el barrido al final
+    // de la region committed en vez de confiar en un tamano inventado.
+    MEMORY_BASIC_INFORMATION mbi{};
+    if (!VirtualQuery(m_MaterialSystem, &mbi, sizeof(mbi)) || mbi.State != MEM_COMMIT)
+    {
+        cached = 0;
+        return 0;
+    }
+    const uintptr_t regionEnd = (uintptr_t)mbi.BaseAddress + mbi.RegionSize;
+    const uintptr_t start     = (uintptr_t)m_MaterialSystem;
+    const uintptr_t limit     = (regionEnd - start) < 0x4000 ? (regionEnd - start) : 0x4000;
+
+    for (uintptr_t off = sizeof(void *); off + sizeof(void *) <= limit; off += sizeof(void *))
+    {
+        if (*(uintptr_t *)((char *)m_MaterialSystem + off) == wantVtable)
+        {
+            cached = (int)off;
+            LogInit("render context embebido: encontrado", (void *)off);
+            return cached;
+        }
+    }
+
+    LogInit("render context embebido: NO ENCONTRADO", nullptr);
+    cached = 0;
+    return 0;
+}
+
 IMatRenderContext *Game::GetRenderContext()
 {
     if (!m_MaterialSystem)
         return nullptr;
 
-    const int off = m_Offsets && m_Offsets->profile ? m_Offsets->profile->matRenderContextOffset : 0;
+    const int off = ResolveEmbeddedRenderContextOffset();
     if (off != 0)
         return (IMatRenderContext *)((char *)m_MaterialSystem + off);
 
@@ -188,11 +297,146 @@ void Game::ReleaseRenderContext(IMatRenderContext *ctx)
     if (!ctx)
         return;
 
-    const int off = m_Offsets && m_Offsets->profile ? m_Offsets->profile->matRenderContextOffset : 0;
-    if (off != 0)
+    if (ResolveEmbeddedRenderContextOffset() != 0)
         return;   // contexto embebido: nunca se hizo AddRef
 
-    ctx->Release();
+    const int idx = Abi().rcRelease;
+    if (idx == kAbiCxx) { ctx->Release(); return; }
+    if (idx < 0)        { LogAbiSkipOnce("ABI sin identificar: Rc_Release"); return; }
+
+    typedef int(__thiscall * Fn)(void *);
+    VFn<Fn>(ctx, idx)(ctx);
+}
+
+ImageFormat Game::MatSys_GetBackBufferFormat()
+{
+    if (!m_MaterialSystem) return IMAGE_FORMAT_UNKNOWN;
+
+    const int idx = Abi().msGetBackBufferFormat;
+    if (idx == kAbiCxx) return m_MaterialSystem->GetBackBufferFormat();
+    if (idx < 0)
+    {
+        LogAbiSkipOnce("ABI sin identificar: MatSys_GetBackBufferFormat");
+        return IMAGE_FORMAT_UNKNOWN;
+    }
+
+    typedef ImageFormat(__thiscall * Fn)(void *);
+    return VFn<Fn>(m_MaterialSystem, idx)(m_MaterialSystem);
+}
+
+void Game::MatSys_BeginRenderTargetAllocation()
+{
+    if (!m_MaterialSystem) return;
+
+    const int idx = Abi().msBeginRenderTargetAllocation;
+    if (idx == kAbiCxx) { m_MaterialSystem->BeginRenderTargetAllocation(); return; }
+    if (idx < 0)        { LogAbiSkipOnce("ABI sin identificar: BeginRenderTargetAllocation"); return; }
+
+    typedef void(__thiscall * Fn)(void *);
+    VFn<Fn>(m_MaterialSystem, idx)(m_MaterialSystem);
+}
+
+void Game::MatSys_EndRenderTargetAllocation()
+{
+    if (!m_MaterialSystem) return;
+
+    const int idx = Abi().msEndRenderTargetAllocation;
+    if (idx == kAbiCxx) { m_MaterialSystem->EndRenderTargetAllocation(); return; }
+    if (idx < 0)        { LogAbiSkipOnce("ABI sin identificar: EndRenderTargetAllocation"); return; }
+
+    typedef void(__thiscall * Fn)(void *);
+    VFn<Fn>(m_MaterialSystem, idx)(m_MaterialSystem);
+}
+
+ITexture *Game::MatSys_CreateNamedRenderTargetTextureEx(
+    const char *name, int w, int h, RenderTargetSizeMode_t sizeMode,
+    ImageFormat format, MaterialRenderTargetDepth_t depth, unsigned int textureFlags)
+{
+    if (!m_MaterialSystem) return nullptr;
+
+    const int idx = Abi().msCreateNamedRenderTargetTextureEx;
+    if (idx == kAbiCxx)
+        return m_MaterialSystem->CreateNamedRenderTargetTextureEx(
+            name, w, h, sizeMode, format, depth, textureFlags);
+    if (idx < 0)
+    {
+        LogAbiSkipOnce("ABI sin identificar: CreateNamedRenderTargetTextureEx");
+        return nullptr;
+    }
+
+    // El 8vo parametro (renderTargetFlags) va explicito: por indice no hay
+    // argumentos por defecto que lo completen.
+    typedef ITexture *(__thiscall * Fn)(void *, const char *, int, int,
+                                        RenderTargetSizeMode_t, ImageFormat,
+                                        MaterialRenderTargetDepth_t, unsigned int, unsigned int);
+    return VFn<Fn>(m_MaterialSystem, idx)(
+        m_MaterialSystem, name, w, h, sizeMode, format, depth, textureFlags, 0);
+}
+
+// isGameRunning es un offset de struct, no un indice de vtable: en retail vive
+// en +0x2BB0, pero en los builds de desarrollo CMaterialSystem es mas chico y
+// escribir ahi cae fuera de la asignacion.
+void Game::MatSys_SetGameRunning(bool running)
+{
+    if (!m_MaterialSystem) return;
+
+    const int off = Abi().msIsGameRunning;
+    if (off < 0)
+    {
+        LogAbiSkipOnce("ABI sin identificar: isGameRunning (no se escribe)");
+        return;
+    }
+    *((bool *)((char *)m_MaterialSystem + off)) = running;
+}
+
+void Game::Rc_SetRenderTarget(IMatRenderContext *rc, ITexture *tex)
+{
+    if (!rc) return;
+
+    const int idx = Abi().rcSetRenderTarget;
+    if (idx == kAbiCxx) { rc->SetRenderTarget(tex); return; }
+    if (idx < 0)        { LogAbiSkipOnce("ABI sin identificar: Rc_SetRenderTarget"); return; }
+
+    typedef void(__thiscall * Fn)(void *, ITexture *);
+    VFn<Fn>(rc, idx)(rc, tex);
+}
+
+void Game::Rc_ClearBuffers(IMatRenderContext *rc, bool color, bool depth, bool stencil)
+{
+    if (!rc) return;
+
+    const int idx = Abi().rcClearBuffers;
+    if (idx == kAbiCxx) { rc->ClearBuffers(color, depth, stencil); return; }
+    if (idx < 0)        { LogAbiSkipOnce("ABI sin identificar: Rc_ClearBuffers"); return; }
+
+    typedef void(__thiscall * Fn)(void *, bool, bool, bool);
+    VFn<Fn>(rc, idx)(rc, color, depth, stencil);
+}
+
+void Game::Rc_ClearColor4ub(IMatRenderContext *rc, unsigned char r, unsigned char g,
+                            unsigned char b, unsigned char a)
+{
+    if (!rc) return;
+
+    const int idx = Abi().rcClearColor4ub;
+    if (idx == kAbiCxx) { rc->ClearColor4ub(r, g, b, a); return; }
+    if (idx < 0)        { LogAbiSkipOnce("ABI sin identificar: Rc_ClearColor4ub"); return; }
+
+    typedef void(__thiscall * Fn)(void *, unsigned char, unsigned char, unsigned char, unsigned char);
+    VFn<Fn>(rc, idx)(rc, r, g, b, a);
+}
+
+void Game::Rc_OverrideAlphaWriteEnable(IMatRenderContext *rc, bool overrideEnable,
+                                       bool alphaWriteEnable)
+{
+    if (!rc) return;
+
+    const int idx = Abi().rcOverrideAlphaWriteEnable;
+    if (idx == kAbiCxx) { rc->OverrideAlphaWriteEnable(overrideEnable, alphaWriteEnable); return; }
+    if (idx < 0)        { LogAbiSkipOnce("ABI sin identificar: Rc_OverrideAlphaWriteEnable"); return; }
+
+    typedef void(__thiscall * Fn)(void *, bool, bool);
+    VFn<Fn>(rc, idx)(rc, overrideEnable, alphaWriteEnable);
 }
 
 // El equivalente a IMatRenderContext::GetWindowSize, pero via Win32.

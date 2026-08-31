@@ -226,7 +226,7 @@ void VR::Update()
             IMatRenderContext *rndrContext = m_Game->GetRenderContext();
             if (rndrContext)
             {
-                rndrContext->SetRenderTarget(NULL);
+                m_Game->Rc_SetRenderTarget(rndrContext, NULL);
                 m_Game->ReleaseRenderContext(rndrContext);
             }
 
@@ -265,31 +265,45 @@ void VR::CreateVRTextures()
     std::cout << "RenderTexture - Width: " << m_RenderWidth << ", Height: " << m_RenderHeight << "\n";
     Game::LogInit("CreateVRTextures: entrada", (void *)1);
 
-    m_Game->m_MaterialSystem->isGameRunning = false;
+    // Todo lo que sigue son llamadas virtuales a IMaterialSystem, cuyos indices
+    // de vtable cambian entre builds: van por los thunks de Game, no directo.
+    m_Game->MatSys_SetGameRunning(false);
     Game::LogInit("CreateVRTextures: antes de BeginRenderTargetAllocation", (void *)1);
-    m_Game->m_MaterialSystem->BeginRenderTargetAllocation();
+    m_Game->MatSys_BeginRenderTargetAllocation();
     Game::LogInit("CreateVRTextures: BeginRenderTargetAllocation ok", (void *)1);
-    m_Game->m_MaterialSystem->isGameRunning = true;
+    m_Game->MatSys_SetGameRunning(true);
+
+    // Una sola consulta, y queda en el log: si el indice estuviera mal esto
+    // devuelve basura y las cuatro texturas salen invalidas por la misma causa.
+    const ImageFormat backBufferFormat = m_Game->MatSys_GetBackBufferFormat();
+    Game::LogInit("CreateVRTextures: backBufferFormat", (void *)(intptr_t)backBufferFormat);
 
     m_CreatingTextureID = Texture_LeftEye;
-    m_LeftEyeTexture = m_Game->m_MaterialSystem->CreateNamedRenderTargetTextureEx("leftEye0", m_RenderWidth, m_RenderHeight, RT_SIZE_NO_CHANGE, m_Game->m_MaterialSystem->GetBackBufferFormat(), MATERIAL_RT_DEPTH_SEPARATE, TEXTUREFLAGS_NOMIP);
-    
+    m_LeftEyeTexture = m_Game->MatSys_CreateNamedRenderTargetTextureEx("leftEye0", m_RenderWidth, m_RenderHeight, RT_SIZE_NO_CHANGE, backBufferFormat, MATERIAL_RT_DEPTH_SEPARATE, TEXTUREFLAGS_NOMIP);
+    Game::LogInit("CreateVRTextures: leftEye0", m_LeftEyeTexture);
+
     m_CreatingTextureID = Texture_RightEye;
-    m_RightEyeTexture = m_Game->m_MaterialSystem->CreateNamedRenderTargetTextureEx("rightEye0", m_RenderWidth, m_RenderHeight, RT_SIZE_NO_CHANGE, m_Game->m_MaterialSystem->GetBackBufferFormat(), MATERIAL_RT_DEPTH_SEPARATE, TEXTUREFLAGS_NOMIP);
+    m_RightEyeTexture = m_Game->MatSys_CreateNamedRenderTargetTextureEx("rightEye0", m_RenderWidth, m_RenderHeight, RT_SIZE_NO_CHANGE, backBufferFormat, MATERIAL_RT_DEPTH_SEPARATE, TEXTUREFLAGS_NOMIP);
+    Game::LogInit("CreateVRTextures: rightEye0", m_RightEyeTexture);
 
     m_CreatingTextureID = Texture_HUD;
-    m_HUDTexture = m_Game->m_MaterialSystem->CreateNamedRenderTargetTextureEx("vrHUD", m_RenderWidth, m_RenderHeight, RT_SIZE_NO_CHANGE, m_Game->m_MaterialSystem->GetBackBufferFormat(), MATERIAL_RT_DEPTH_SHARED, TEXTUREFLAGS_NOMIP);
-    
-    m_CreatingTextureID = Texture_Blank;
-    m_BlankTexture = m_Game->m_MaterialSystem->CreateNamedRenderTargetTextureEx("blankTexture", 512, 512, RT_SIZE_NO_CHANGE, m_Game->m_MaterialSystem->GetBackBufferFormat(), MATERIAL_RT_DEPTH_SHARED, TEXTUREFLAGS_NOMIP);
-    
-    m_CreatingTextureID = Texture_None;
-    Game::LogInit("CreateVRTextures: 4 texturas creadas", m_LeftEyeTexture);
+    m_HUDTexture = m_Game->MatSys_CreateNamedRenderTargetTextureEx("vrHUD", m_RenderWidth, m_RenderHeight, RT_SIZE_NO_CHANGE, backBufferFormat, MATERIAL_RT_DEPTH_SHARED, TEXTUREFLAGS_NOMIP);
+    Game::LogInit("CreateVRTextures: vrHUD", m_HUDTexture);
 
-    m_Game->m_MaterialSystem->EndRenderTargetAllocation();
+    m_CreatingTextureID = Texture_Blank;
+    m_BlankTexture = m_Game->MatSys_CreateNamedRenderTargetTextureEx("blankTexture", 512, 512, RT_SIZE_NO_CHANGE, backBufferFormat, MATERIAL_RT_DEPTH_SHARED, TEXTUREFLAGS_NOMIP);
+    Game::LogInit("CreateVRTextures: blankTexture", m_BlankTexture);
+
+    m_CreatingTextureID = Texture_None;
+
+    m_Game->MatSys_EndRenderTargetAllocation();
     Game::LogInit("CreateVRTextures: completo", (void *)1);
 
-    m_CreatedVRTextures = true;
+    // Sin las cuatro texturas no hay nada que someter al compositor, y seguir
+    // como si estuvieran deja punteros null circulando por el hilo de render.
+    m_CreatedVRTextures = m_LeftEyeTexture && m_RightEyeTexture && m_HUDTexture && m_BlankTexture;
+    if (!m_CreatedVRTextures)
+        Game::LogInit("CreateVRTextures: FALTAN TEXTURAS, VR queda inactivo", nullptr);
 }
 
 void VR::SubmitVRTextures()
@@ -307,10 +321,10 @@ void VR::SubmitVRTextures()
         {
             // menu only renders to the window portion of the texture. Until we figure out a proper fix,
             // as a workaround only show that portion of the texture
+            // El render context que se pedia aca quedo sin uso cuando
+            // GetGameWindowSize paso a resolverse por Win32.
             int windowWidth, windowHeight;
-            IMatRenderContext* rndrContext = m_Game->m_MaterialSystem->GetRenderContext();
             m_Game->GetGameWindowSize(windowWidth, windowHeight);
-            rndrContext->Release();
 
             bounds.uMax = (float)windowWidth / m_RenderWidth;
             bounds.vMax = (float)windowHeight / m_RenderHeight;

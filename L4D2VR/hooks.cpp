@@ -226,7 +226,7 @@ void __fastcall Hooks::dRenderView(void *ecx, void *edx, CViewSetup &setup, CVie
 
 	//VPanel* g_pFullscreenRootPanel = *(VPanel**)(m_Game->m_Offsets->g_pFullscreenRootPanel.address);
 
-	IMaterialSystem* matSystem = m_Game->m_MaterialSystem;
+	// (el IMaterialSystem local se fue: las llamadas van por los thunks de Game)
 
 	hudViewSetup.width = m_VR->m_RenderWidth;
 	hudViewSetup.height = m_VR->m_RenderHeight;
@@ -288,9 +288,9 @@ void __fastcall Hooks::dRenderView(void *ecx, void *edx, CViewSetup &setup, CVie
 	leftEyeView.angles.y = tempAngle.y;
 
 	//std::cout << "dRenderView - Left Start\n";
-	IMatRenderContext* rndrContext = matSystem->GetRenderContext();
-	rndrContext->SetRenderTarget(m_VR->m_LeftEyeTexture);
-	rndrContext->Release();
+	IMatRenderContext* rndrContext = m_Game->GetRenderContext();
+	m_Game->Rc_SetRenderTarget(rndrContext, m_VR->m_LeftEyeTexture);
+	m_Game->ReleaseRenderContext(rndrContext);
 	hkRenderView.fOriginal(ecx, leftEyeView, hudViewSetup, nClearFlags, whatToDraw);
 	
 	// Right eye CViewSetup
@@ -299,18 +299,18 @@ void __fastcall Hooks::dRenderView(void *ecx, void *edx, CViewSetup &setup, CVie
 	rightEyeView.angles.y = tempAngle.y;
 
 	//std::cout << "dRenderView - Right Start\n";
-	rndrContext = matSystem->GetRenderContext();
-	rndrContext->SetRenderTarget(m_VR->m_RightEyeTexture);
-	rndrContext->Release();
+	rndrContext = m_Game->GetRenderContext();
+	m_Game->Rc_SetRenderTarget(rndrContext, m_VR->m_RightEyeTexture);
+	m_Game->ReleaseRenderContext(rndrContext);
 	hkRenderView.fOriginal(ecx, rightEyeView, hudViewSetup, nClearFlags, whatToDraw);
 
 	m_PushedHud = false;
 
 
 
-	rndrContext = matSystem->GetRenderContext();
-	rndrContext->SetRenderTarget(NULL);
-	rndrContext->Release();
+	rndrContext = m_Game->GetRenderContext();
+	m_Game->Rc_SetRenderTarget(rndrContext, NULL);
+	m_Game->ReleaseRenderContext(rndrContext);
 
 	/*rndrContext = matSystem->GetRenderContext();
 
@@ -552,17 +552,17 @@ void Hooks::dPushRenderTargetAndViewport(void *ecx, void *edx, ITexture *pTextur
 
 		//pTexture = m_VR->m_RightEyeTexture;
 
-		IMatRenderContext *renderContext = m_Game->m_MaterialSystem->GetRenderContext();
-		renderContext->ClearBuffers(false, true, true);
-		renderContext->Release();
+		IMatRenderContext *renderContext = m_Game->GetRenderContext();
+		m_Game->Rc_ClearBuffers(renderContext, false, true, true);
+		m_Game->ReleaseRenderContext(renderContext);
 
 		hkPushRenderTargetAndViewport.fOriginal(ecx, pTexture, pDepthTexture, nViewX, nViewY, nViewW, nViewH);
 
-		renderContext = m_Game->m_MaterialSystem->GetRenderContext();
-		renderContext->OverrideAlphaWriteEnable(true, true);
-		renderContext->ClearColor4ub(0, 0, 0, 0);
-		renderContext->ClearBuffers(true, false);
-		renderContext->Release();
+		renderContext = m_Game->GetRenderContext();
+		m_Game->Rc_OverrideAlphaWriteEnable(renderContext, true, true);
+		m_Game->Rc_ClearColor4ub(renderContext, 0, 0, 0, 0);
+		m_Game->Rc_ClearBuffers(renderContext, true, false, false);
+		m_Game->ReleaseRenderContext(renderContext);
 
 		m_VR->m_RenderedHud = true;
 		m_PushedHud = true;
@@ -587,10 +587,10 @@ void Hooks::dPopRenderTargetAndViewport(void *ecx, void *edx)
 
 	if (m_PushedHud)
 	{
-		IMatRenderContext* renderContext = m_Game->m_MaterialSystem->GetRenderContext();
-		renderContext->OverrideAlphaWriteEnable(false, true);
-		renderContext->ClearColor4ub(0, 0, 0, 255);
-		renderContext->Release();
+		IMatRenderContext* renderContext = m_Game->GetRenderContext();
+		m_Game->Rc_OverrideAlphaWriteEnable(renderContext, false, true);
+		m_Game->Rc_ClearColor4ub(renderContext, 0, 0, 0, 255);
+		m_Game->ReleaseRenderContext(renderContext);
 	}
 
 	hkPopRenderTargetAndViewport.fOriginal(ecx);

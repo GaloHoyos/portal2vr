@@ -3,6 +3,12 @@
 #include <array>
 #include <initializer_list>
 #include "vector.h"
+// Por ImageFormat, RenderTargetSizeMode_t y MaterialRenderTargetDepth_t, que
+// aparecen en las firmas de los thunks MatSys_*. No genera ciclo: material.h
+// solo incluye texture.h.
+#include "material.h"
+
+struct AbiLayout;
 
 class IClientEntityList;
 class IMatRenderContext;
@@ -95,6 +101,38 @@ public:
     // el indice de vtable de GetRenderContext cambia entre builds.
     IMatRenderContext *GetRenderContext();
     void ReleaseRenderContext(IMatRenderContext *ctx);
+
+    // Offset del CMatRenderContext embebido en CMaterialSystem, o 0 para usar
+    // la llamada virtual. Se resuelve una vez y se cachea; si el perfil trae el
+    // RVA de la vtable, valida el offset contra el objeto vivo.
+    int ResolveEmbeddedRenderContextOffset();
+
+    // --- ABI dependiente del build ---------------------------------------
+    //
+    // Toda llamada virtual a IMaterialSystem o IMatRenderContext pasa por aca.
+    // Los builds reportan la misma version de interfaz (VMaterialSystem080) con
+    // vtables distintas, asi que el indice no se puede fijar en tiempo de
+    // compilacion. El perfil decide: kAbiCxx usa la declaracion de sdk/, que es
+    // la de retail; un indice explicito usa el slot medido en ese build;
+    // kAbiUnknown saltea la llamada y lo registra una vez.
+    const AbiLayout &Abi() const;
+
+    ImageFormat MatSys_GetBackBufferFormat();
+    void        MatSys_BeginRenderTargetAllocation();
+    void        MatSys_EndRenderTargetAllocation();
+    ITexture   *MatSys_CreateNamedRenderTargetTextureEx(
+                    const char *name, int w, int h,
+                    RenderTargetSizeMode_t sizeMode, ImageFormat format,
+                    MaterialRenderTargetDepth_t depth, unsigned int textureFlags);
+    // No hace nada si el perfil no ubica isGameRunning en este build.
+    void        MatSys_SetGameRunning(bool running);
+
+    void Rc_SetRenderTarget(IMatRenderContext *rc, ITexture *tex);
+    void Rc_ClearBuffers(IMatRenderContext *rc, bool color, bool depth, bool stencil);
+    void Rc_ClearColor4ub(IMatRenderContext *rc, unsigned char r, unsigned char g,
+                          unsigned char b, unsigned char a);
+    void Rc_OverrideAlphaWriteEnable(IMatRenderContext *rc, bool overrideEnable,
+                                     bool alphaWriteEnable);
 
     static void errorMsg(const char *msg);
     static void LogInit(const char *what, const void *ptr);
