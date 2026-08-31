@@ -1113,6 +1113,34 @@ void VR::UpdateTracking()
     if ((cameraFollowing < 0 && cameraDistance > 1) || (m_PushingThumbstick))
         m_RoomscaleActive = false;*/
 
+    // P2VR_TRACKLOG=1 registra angulos y posiciones cada ~30 frames. Sirve para
+    // diagnosticar cosas que solo se notan con el visor puesto: inclinar la
+    // cabeza y ver que numero se mueve.
+    {
+        static int s_tl = -1;
+        if (s_tl < 0)
+        {
+            char v[8]; size_t n = 0;
+            s_tl = (getenv_s(&n, v, sizeof(v), "P2VR_TRACKLOG") == 0 && n > 1) ? 1 : 0;
+        }
+        static int s_n = 0;
+        if (s_tl && (++s_n % 30) == 0)
+        {
+            const Vector eyeL = GetViewOriginLeft(m_SetupOrigin);
+            const Vector eyeR = GetViewOriginRight(m_SetupOrigin);
+            char m[256];
+            sprintf_s(m, "TRK ang p=%.1f y=%.1f r=%.1f | rel=%.2f,%.2f,%.2f | right=%.3f,%.3f,%.3f",
+                m_HmdAngAbs.x, m_HmdAngAbs.y, m_HmdAngAbs.z,
+                m_HmdPosRelative.x, m_HmdPosRelative.y, m_HmdPosRelative.z,
+                m_HmdRight.x, m_HmdRight.y, m_HmdRight.z);
+            Game::LogInit(m, nullptr);
+            sprintf_s(m, "TRK eyeL=%.2f,%.2f,%.2f  eyeR=%.2f,%.2f,%.2f  dz=%.2f  ipd=%.3f eyeZ=%.3f",
+                eyeL.x, eyeL.y, eyeL.z, eyeR.x, eyeR.y, eyeR.z, eyeL.z - eyeR.z,
+                m_Ipd, m_EyeZ);
+            Game::LogInit(m, nullptr);
+        }
+    }
+
     m_AimPos = Trace((uint32_t*)localPlayer);
 
     if (m_AimMode == 2) {
