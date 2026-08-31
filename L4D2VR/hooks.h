@@ -36,11 +36,14 @@ struct Hook {
 		if (!targetFunc)
 			return 1;
 
+		// Los fallos van al log, no a un MessageBox. Un dialogo modal lanzado
+		// desde el hilo de init pasa completamente desapercibido cuando el
+		// juego se arranca con Start-Process, y ya hubo horas perdidas por eso.
 		if (MH_CreateHook(targetFunc, detourFunc, reinterpret_cast<LPVOID *>(&fOriginal)) != MH_OK)
 		{
-			char errorString[512];
-			sprintf_s(errorString, 512, "Failed to create hook with this signature: %s", typeid(T).name());
-			Game::errorMsg(errorString);
+			char msg[512];
+			sprintf_s(msg, "hook: MH_CreateHook FALLO %s", typeid(T).name());
+			Game::LogInit(msg, targetFunc);
 			return 1;
 		}
 		pTarget = targetFunc;
@@ -55,12 +58,16 @@ struct Hook {
 		MH_STATUS status = MH_EnableHook(pTarget);
 		if (status != MH_OK)
 		{
-			char errorString[256];
-			sprintf_s(errorString, 256, "Failed to enable hook: %i", status);
-			Game::errorMsg(errorString);
+			char msg[512];
+			sprintf_s(msg, "hook: MH_EnableHook FALLO (%i) %s", status, typeid(T).name());
+			Game::LogInit(msg, pTarget);
 			return 1;
 		}
 		isEnabled = true;
+
+		char msg[512];
+		sprintf_s(msg, "hook activo: %s", typeid(T).name());
+		Game::LogInit(msg, pTarget);
 		return 0;
 	}
 
@@ -71,7 +78,7 @@ struct Hook {
 
 		if (MH_DisableHook(pTarget) != MH_OK)
 		{
-			Game::errorMsg("Failed to disable hook");
+			Game::LogInit("hook: MH_DisableHook FALLO", pTarget);
 			return 1;
 		}
 		isEnabled = false;

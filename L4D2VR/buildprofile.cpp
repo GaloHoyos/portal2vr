@@ -53,7 +53,7 @@ static const OffsetDef kRetail2011[] = {
 //   hint = RVA verificado. signature vacia = todavia sin portar.
 static const OffsetDef kBuild852_6[] = {
     { "GetFullScreenTexture", "client.dll", 0, "", 0 },  // TODO portar
-    { "RenderView", "client.dll", 0x17BAF0, "56 8B F1 6A 00 8D 8E ? ? ? ? E8 ? ? ? ?", 0 },
+    { "RenderView", "client.dll", 0x197F10, "55 8B EC 83 E4 C0 81 EC 34 02 00 00 53 56 57 8B F9 6A 00 8D 8F ? ? ? ? 89 7C 24", 0 },  // RTTI CViewRender[6]; el [3] es Shutdown()
     { "g_pClientMode", "client.dll", 0, "", 2 },  // TODO portar
     { "CalcViewModelView", "client.dll", 0, "", 0 },  // TODO portar
     { "CreateMove", "client.dll", 0x1CC970, "A1 ? ? ? ? 83 EC 0C 83 78 30 00 57 8B F9", 0 },
@@ -103,7 +103,7 @@ static const OffsetDef kBuild852_6[] = {
 //   Ninguna firma de 852_6 sirve aca, hay que derivarlas de cero.
 static const OffsetDef kBuild852_0[] = {
     { "GetFullScreenTexture", "client.dll", 0, "", 0 },  // TODO Fase E
-    { "RenderView", "client.dll", 0x165270, "56 8B F1 6A 00 8D 8E ? ? ? ? E8 ? ? ? ? 6A 00 8D 8E ? ? ? ? E8 ? ? ? ?", 0 },  // RTTI CViewRender[3]; el patron corto matchea 2 veces
+    { "RenderView", "client.dll", 0x181120, "81 EC BC 01 00 00 53 55 8B E9 6A 00 8D 8D ? ? ? ? E8", 0 },  // RTTI CViewRender[6]; el [3] es Shutdown()
     { "g_pClientMode", "client.dll", 0, "", 2 },  // TODO Fase E
     { "CalcViewModelView", "client.dll", 0, "", 0 },  // TODO Fase E
     { "CreateMove", "client.dll", 0, "", 0 },  // TODO Fase E
