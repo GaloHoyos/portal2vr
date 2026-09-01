@@ -884,16 +884,21 @@ bool __fastcall Hooks::dTraceFirePortal(void* ecx, void* edx, const Vector& vTra
 		auto owner = SafeGetOwner(ecx);
 		int index = SafeEntityIndex(owner);
 
-		// Sin owner o sin indice valido se pasa el trace original sin tocar.
-		if (owner && IsValidPlayerIndex(index)) {
-			auto vrPlayer = m_Game->m_PlayersVRInfo[index];
+		// En algunas builds GetOwner esta inlineado y no queda ninguna direccion
+		// a la que apuntar, asi que no hay forma de preguntar quien disparo. Un
+		// solo jugador tiene portalgun en singleplayer, y iPlacedBy==2 ya
+		// significa "lo coloco un jugador", asi que se asume que es el local en
+		// vez de perder el disparo desde el control por completo.
+		const bool assumeLocalPlayer = !GetOwner;
 
-			if (m_VR->m_IsVREnabled && localIndex == index) {
+		if (assumeLocalPlayer || (owner && IsValidPlayerIndex(index))) {
+			if (m_VR->m_IsVREnabled && (assumeLocalPlayer || localIndex == index)) {
 				vNewTraceStart = m_VR->GetRightControllerAbsPos();
 				vNewDirection = m_VR->m_RightControllerForward;
 			}
-			else if (vrPlayer.isUsingVR)
+			else if (!assumeLocalPlayer && m_Game->m_PlayersVRInfo[index].isUsingVR)
 			{
+				auto vrPlayer = m_Game->m_PlayersVRInfo[index];
 				vNewTraceStart = vrPlayer.controllerPos;
 				Vector fwd, rt, up;
 				QAngle::AngleVectors(vrPlayer.controllerAngle, &fwd, &rt, &up);
