@@ -107,7 +107,7 @@ static const OffsetDef kBuild852_0[] = {
     { "GetFullScreenTexture", "client.dll", 0, "", 0 },  // TODO Fase E
     { "RenderView", "client.dll", 0x181120, "81 EC BC 01 00 00 53 55 8B E9 6A 00 8D 8D ? ? ? ? E8", 0 },  // RTTI CViewRender[6]; el [3] es Shutdown()
     { "g_pClientMode", "client.dll", 0, "", 2 },  // TODO Fase E
-    { "CalcViewModelView", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "CalcViewModelView", "client.dll", 0x143D0, "83 EC 74 8B 84 24 80 00 00 00 F3 0F 7E 00 53 56 8B F1 8B 48 08", 0 },  // C_BaseViewModel::CalcViewModelView(owner, pos, ang): unico lector de viewmodel_offset_x, y slot [204] de C_BaseViewModel
     { "CreateMove", "client.dll", 0x95940, "6A FF E8 ? ? ? ? 83 C4 04 85 C0 75 ? B0 01 C2 08 00 8B 4C 24 08", 0 },  // ClientModeShared::CreateMove, RTTI ClientModePortalNormal[23]
     { "WriteUsercmd", "client.dll", 0, "", 0 },  // TODO Fase E
     { "g_pppInput", "client.dll", 0, "", 2 },  // TODO Fase E
@@ -318,6 +318,10 @@ static constexpr AbiLayout AbiBuild852_0()
     // vtable[242] de C_Portal_Player no esta verificado en este build, y los
     // offsets de C_Portal_Player y CWeaponPortalBase tampoco.
     a.laserAimSupported = false;
+
+    // El offset apunta a C_BaseViewModel::CalcViewModelView, no a la del
+    // jugador: en corehub esa no quedo como funcion separada.
+    a.calcViewModelViewTakesOwner = true;
 
     // Retail los tiene en 114/133/139, y la vtable de corehub tiene ~90 slots:
     // el override de tamano de pantalla no existe en este build. Los tres se

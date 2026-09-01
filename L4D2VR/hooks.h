@@ -93,6 +93,8 @@ typedef void(__thiscall *tRenderView)(void *thisptr, CViewSetup &setup, CViewSet
 typedef bool(__thiscall *tCreateMove)(void *thisptr, float flInputSampleTime, CUserCmd *cmd);
 typedef void(__thiscall *tEndFrame)(PVOID);
 typedef void(__thiscall *tCalcViewModelView)(void *thisptr, const Vector &eyePosition, const QAngle &eyeAngles);
+// La variante de C_BaseViewModel lleva el owner adelante. Ver AbiLayout::calcViewModelViewTakesOwner.
+typedef void(__thiscall *tCalcViewModelViewVM)(void *thisptr, void *owner, const Vector &eyePosition, const QAngle &eyeAngles);
 typedef float(__thiscall *tProcessUsercmds)(void *thisptr, edict_t *player, void *buf, int numcmds, int totalcmds, int dropped_packets, bool ignore, bool paused);
 typedef int(__cdecl *tReadUsercmd)(void *buf, CUserCmd *move, CUserCmd *from);
 typedef void(__thiscall *tWriteUsercmdDeltaToBuffer)(void *thisptr, int a1, void *buf, int from, int to, bool isnewcommand);
@@ -182,6 +184,7 @@ public:
 	static inline Hook<tCreateMove> hkCreateMove;
 	static inline Hook<tEndFrame> hkEndFrame;
 	static inline Hook<tCalcViewModelView> hkCalcViewModelView;
+	static inline Hook<tCalcViewModelViewVM> hkCalcViewModelViewVM;
 	static inline Hook<tProcessUsercmds> hkProcessUsercmds;
 	static inline Hook<tReadUsercmd> hkReadUsercmd;
 	static inline Hook<tWriteUsercmdDeltaToBuffer> hkWriteUsercmdDeltaToBuffer;
@@ -254,6 +257,7 @@ public:
 	static bool __fastcall dCreateMove(void *ecx, void *edx, float flInputSampleTime, CUserCmd *cmd);
 	static void __fastcall dEndFrame(void *ecx, void *edx);
 	static void __fastcall dCalcViewModelView(void *ecx, void *edx, const Vector &eyePosition, const QAngle &eyeAngles);
+	static void __fastcall dCalcViewModelViewVM(void *ecx, void *edx, void *owner, const Vector &eyePosition, const QAngle &eyeAngles);
 	static int dServerFireTerrorBullets(int playerId, const Vector &vecOrigin, const QAngle &vecAngles, int a4, int a5, int a6, float a7);
 	static int dClientFireTerrorBullets(int playerId, const Vector &vecOrigin, const QAngle &vecAngles, int a4, int a5, int a6, float a7);
 	static float __fastcall dProcessUsercmds(void *ecx, void *edx, edict_t *player, void *buf, int numcmds, int totalcmds, int dropped_packets, bool ignore, bool paused);

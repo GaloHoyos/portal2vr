@@ -128,6 +128,15 @@ struct AbiLayout
     // de una partida: en el menu no se nota. false = AimMode se fuerza a 0.
     bool laserAimSupported = true;
 
+    // De que clase es el CalcViewModelView al que apunta el offset.
+    //
+    // Retail engancha C_BasePlayer::CalcViewModelView(pos, ang), que recorre
+    // los viewmodels y delega. En corehub esa funcion no quedo como simbolo
+    // separado, pero si esta C_BaseViewModel::CalcViewModelView(owner, pos,
+    // ang) -- la que de verdad posiciona el modelo, un nivel mas cerca del
+    // efecto. Cambia la firma del detour, no lo que hace.
+    bool calcViewModelViewTakesOwner = false;
+
     // --- ISurface (vguimatsurface): indices de vtable ---
     //
     // IsCursorVisible se llama una vez por frame. Por el indice equivocado en

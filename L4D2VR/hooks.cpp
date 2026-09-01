@@ -24,6 +24,7 @@ Hooks::Hooks(Game *game)
 
 	//hkGetRenderTarget.enableHook();
 	hkCalcViewModelView.enableHook();
+	hkCalcViewModelViewVM.enableHook();
 
 	hkProcessUsercmds.enableHook();
 	hkReadUsercmd.enableHook();
@@ -79,7 +80,10 @@ int Hooks::initSourceHooks()
 	hkRenderView.createHook(pRenderViewVFunc, &dRenderView);
 
 	LPVOID calcViewModelViewAddr = (LPVOID)(m_Game->m_Offsets->CalcViewModelView.address);
-	hkCalcViewModelView.createHook(calcViewModelViewAddr, &dCalcViewModelView);
+	if (m_Game->Abi().calcViewModelViewTakesOwner)
+		hkCalcViewModelViewVM.createHook(calcViewModelViewAddr, &dCalcViewModelViewVM);
+	else
+		hkCalcViewModelView.createHook(calcViewModelViewAddr, &dCalcViewModelView);
 
 	LPVOID ProcessUsercmdsAddr = (LPVOID)(m_Game->m_Offsets->ProcessUsercmds.address);
 	hkProcessUsercmds.createHook(ProcessUsercmdsAddr, &dProcessUsercmds);
@@ -634,6 +638,23 @@ void __fastcall Hooks::dCalcViewModelView(void *ecx, void *edx, const Vector &ey
 
 
 	return hkCalcViewModelView.fOriginal(ecx, vecNewOrigin, vecNewAngles);
+}
+
+// Igual que dCalcViewModelView pero para la variante de C_BaseViewModel, que
+// recibe el owner adelante. Lo unico que cambia es la firma: el viewmodel se
+// reposiciona sobre el control derecho exactamente igual.
+void __fastcall Hooks::dCalcViewModelViewVM(void *ecx, void *edx, void *owner, const Vector &eyePosition, const QAngle &eyeAngles)
+{
+	Vector vecNewOrigin = eyePosition;
+	QAngle vecNewAngles = eyeAngles;
+
+	if (m_VR->m_IsVREnabled)
+	{
+		vecNewOrigin = m_VR->GetRecommendedViewmodelAbsPos(eyePosition);
+		vecNewAngles = m_VR->GetRecommendedViewmodelAbsAngle();
+	}
+
+	return hkCalcViewModelViewVM.fOriginal(ecx, owner, vecNewOrigin, vecNewAngles);
 }
 
 float __fastcall Hooks::dProcessUsercmds(void *ecx, void *edx, edict_t *player, void *buf, int numcmds, int totalcmds, int dropped_packets, bool ignore, bool paused)
