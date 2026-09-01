@@ -138,12 +138,12 @@ static const OffsetDef kBuild852_0[] = {
     { "UTIL_Portal_FirstAlongRay", "server.dll", 0, "", 0 },  // TODO Fase E
     { "UTIL_IntersectRayWithPortal", "server.dll", 0, "", 0 },  // TODO Fase E
     { "UTIL_Portal_AngleTransform", "server.dll", 0, "", 0 },  // TODO Fase E
-    { "Weapon_ShootPosition", "server.dll", 0, "", 0 },  // TODO Fase E
-    { "ComputeError", "server.dll", 0, "", 0 },  // TODO Fase E
-    { "UpdateObject", "server.dll", 0, "", 0 },  // TODO Fase E
-    { "UpdateObjectVM", "server.dll", 0, "", 0 },  // TODO Fase E
-    { "RotateObject", "server.dll", 0, "", 0 },  // TODO Fase E
-    { "EyeAngles", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "Weapon_ShootPosition", "server.dll", 0x2D5B0, "8B 01 8B 90 04 02 00 00 56 8B 74 24 08 56 FF D2 8B C6 5E C2 04 00", 0 },  // ret 4 (solo el sret); reenvia a vtable[129] = EyePosition, textual respecto de Source
+    { "ComputeError", "server.dll", 0x321DF0, "55 8B EC 83 E4 F0 0F 57 C0 81 EC A8 00 00 00 56 57 8B F9 0F 2F 47 38 72", 0 },  // ret simple = 0 params; la llama UpdateObjectVM
+    { "UpdateObject", "server.dll", 0, "", 0 },  // NO PORTAR: el candidato (0x323D90, llama a UpdateObjectVM y ComputeError) da ret 0x10 = 4 params, y el mod lo declara con 3. Enganchar con la firma equivocada desbalancea la pila.
+    { "UpdateObjectVM", "server.dll", 0x322C80, "55 8B EC 83 E4 F0 81 EC 84 02 00 00 53 8B 5D 08 8B 83 18 01 00 00 56 57 C1 E8 0C", 0 },  // ret 0x08 = 2 params, como lo declara el mod; llama a EyeAngles y a ComputeError
+    { "RotateObject", "server.dll", 0x3214D0, "F3 0F 10 4C 24 0C 0F 57 C0 81 EC BC 00 00 00 0F 2E C8 9F F6 C4 44 57 8B F9", 0 },  // ret 0x10 = 4 params, como lo declara el mod; llama a EyeAngles
+    { "EyeAngles", "server.dll", 0xDC2F0, "8B 91 54 01 00 00 83 EC 60 83 FA FF 56 74 ? 8B 35 ? ? ? ? 8B C2 25 FF FF 00", 0 },  // vtable[130]; resuelve m_hMoveParent en +0x154 y si no hay padre devuelve pl.v_angle en +0xb0c, si lo hay un static con guarda de init
     { "MatrixBuildPerspectiveX", "engine.dll", 0, "", 0 },  // TODO Fase E
     { "GetFOV", "client.dll", 0, "", 0 },  // TODO Fase E
     { "GetDefaultFOV", "client.dll", 0, "", 0 },  // TODO Fase E

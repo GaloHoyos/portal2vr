@@ -300,6 +300,9 @@ public:
 	// Calcula la posicion en pantalla del punto al que apunta el control.
 	// Devuelve false si no se pudo (sin ClipTransform no hay proyeccion).
 	static bool AimScreenPos(int x, int y, int &newX, int &newY);
+	// Ultimo tamano que dSurfaceGetScreenSize le reporto a VGUI.
+	static inline int s_HudScreenWide = 0;
+	static inline int s_HudScreenTall = 0;
 	static bool dClipTransform(const Vector& point, Vector* pScreen);
 	static void __fastcall dSetBounds(void* ecx, void* edx, int x, int y, int w, int h);
 	static void __fastcall dSetSize(void* ecx, void* edx, int wide, int tall);

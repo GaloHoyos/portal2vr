@@ -243,15 +243,20 @@ function Test-P2VRSignature {
     param(
         [Parameter(Mandatory)][string]$Build,
         [Parameter(Mandatory)][string]$Module,
-        [Parameter(Mandatory)][string]$Pattern
+        [Parameter(Mandatory)][string]$Pattern,
+        # Antes estaba clavado en 5, asi que "matches=5" en realidad queria decir
+        # "5 o mas" y no servia para enumerar. Los veredictos UNICA (1) y
+        # "no matchea" (0) nunca se vieron afectados; el conteo alto si.
+        [int]$Max = 64
     )
     Initialize-P2VRMatcher
     $img = Get-P2VRImage -Build $Build -Module $Module
-    $hits = [P2VRMatch]::Find($img.Bytes, (ConvertTo-P2VRPattern $Pattern), 5)
+    $hits = [P2VRMatch]::Find($img.Bytes, (ConvertTo-P2VRPattern $Pattern), $Max)
 
     $rvas = @()
     foreach ($h in $hits) { $rvas += ("0x{0:X}" -f (ConvertTo-P2VRRva -Image $img -FileOffset $h)) }
-    Write-Output ("matches={0}  [{1}]" -f $hits.Count, ($rvas -join ", "))
+    $capped = if ($hits.Count -ge $Max) { " (cortado en $Max)" } else { "" }
+    Write-Output ("matches={0}{1}  [{2}]" -f $hits.Count, $capped, ($rvas -join ", "))
     if     ($hits.Count -eq 1) { Write-Output "  --> UNICA, sirve" }
     elseif ($hits.Count -eq 0) { Write-Output "  --> no matchea" }
     else                       { Write-Output "  --> AMBIGUA, alargar la firma" }

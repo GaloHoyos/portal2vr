@@ -997,10 +997,18 @@ void __fastcall Hooks::dSurfaceGetScreenSize(void* ecx, void* edx, int& wide, in
 	{
 		wide = m_VR->m_RenderWidth;
 		tall = m_VR->m_RenderHeight;
+		s_HudScreenWide = wide;
+		s_HudScreenTall = tall;
 		return;
 	}
 
 	hkSurfaceGetScreenSize.fOriginal(ecx, wide, tall);
+
+	// Se guarda lo ultimo que se reporto, sea la mentira o el valor real. VGUI
+	// maqueta con esto, asi que reubicar la mira tiene que usar el mismo
+	// espacio: si no, queda un corrimiento fijo del tamano de la diferencia.
+	s_HudScreenWide = wide;
+	s_HudScreenTall = tall;
 }
 
 void __cdecl Hooks::dMsgEntityPortalled(void* msg)
@@ -1080,16 +1088,45 @@ bool Hooks::AimScreenPos(int x, int y, int &newX, int &newY)
 	if (!m_VR->m_IsVREnabled || !hkClipTransform.fOriginal)
 		return false;
 
-	int windowWidth, windowHeight;
-	m_Game->GetGameWindowSize(windowWidth, windowHeight);
+	// Tiene que ser el mismo tamano que VGUI uso para maquetar, no el de la
+	// ventana: con el hook de GetScreenSize activo son distintos (2584x2820
+	// contra 1280x720), y la diferencia se traducia en la mira corrida ~1050px
+	// hacia abajo. Se toma lo ultimo que reporto el hook para que no puedan
+	// desincronizarse.
+	int hudWide = s_HudScreenWide, hudTall = s_HudScreenTall;
+	if (hudWide <= 0 || hudTall <= 0)
+		m_Game->GetGameWindowSize(hudWide, hudTall);
 
 	Vector screen = { 0, 0, 0 };
-	ScreenTransform(m_VR->m_AimPos, &screen, m_VR->m_RenderWidth, m_VR->m_RenderHeight);
+	ScreenTransform(m_VR->m_AimPos, &screen, hudWide, hudTall);
 
 	// x/y vienen centrados por VGUI; se conserva ese corrimiento para no perder
 	// el centrado del icono respecto de su propio tamano.
-	newX = (int)screen.x + (x - (int)(windowWidth * 0.5f));
-	newY = (int)screen.y + (y - (int)(windowHeight * 0.5f));
+	newX = (int)screen.x + (x - (int)(hudWide * 0.5f));
+	newY = (int)screen.y + (y - (int)(hudTall * 0.5f));
+
+	// P2VR_HUDLOG=1: una linea cada 60 dibujos con la cuenta completa. Sirve
+	// para distinguir "la posicion esta mal" de "la posicion esta bien pero
+	// VGUI recorta el dibujo": si newY barre todo el rango y aun asi no se ve
+	// abajo de cierta altura, no es la matematica, es el clip del panel.
+	static int hudlog = -1;
+	if (hudlog < 0)
+	{
+		char v[8]; size_t n = 0;
+		hudlog = (getenv_s(&n, v, sizeof(v), "P2VR_HUDLOG") == 0 && n > 1) ? 1 : 0;
+	}
+	if (hudlog)
+	{
+		static int tick = 0;
+		if ((tick++ % 60) == 0)
+		{
+			char msg[256];
+			sprintf_s(msg, "HUD: hud=%dx%d  in=(%d,%d)  proj=(%.0f,%.0f)  out=(%d,%d)  aim=(%.0f,%.0f,%.0f)",
+				hudWide, hudTall, x, y, screen.x, screen.y, newX, newY,
+				m_VR->m_AimPos.x, m_VR->m_AimPos.y, m_VR->m_AimPos.z);
+			Game::LogInit(msg, nullptr);
+		}
+	}
 	return true;
 }
 
@@ -1175,7 +1212,11 @@ double __fastcall Hooks::dComputeError(void* ecx, void* edx) {
 
 	m_VR->m_OverrideEyeAngles = true;
 
-	double computedError = hkComputeError.fOriginal(edx);
+	// Iba edx, que en __fastcall es el segundo registro y aca no significa nada:
+	// el thisptr es ecx. El hook esta deshabilitado (igual que en upstream), asi
+	// que nunca llego a ejecutarse, pero ahora que el offset resuelve en corehub
+	// dejarlo mal seria una trampa para el proximo que lo habilite.
+	double computedError = hkComputeError.fOriginal(ecx);
 
 	if (!wasTrue)
 		m_VR->m_OverrideEyeAngles = false;

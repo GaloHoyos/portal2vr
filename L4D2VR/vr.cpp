@@ -252,6 +252,22 @@ void VR::Update()
                 sprintf_s(m, "recentrado al entrar a partida: centro z=%.3f m", m_Center.z);
                 Game::LogInit(m, nullptr);
             }
+
+            // La calibracion del viewmodel ahora vive en el perfil del build.
+            // Estas ConVars son FCVAR_ARCHIVE, asi que lo que se haya usado
+            // para calibrar a mano quedo guardado en config.cfg y se sumaria
+            // encima, aplicando el ajuste dos veces. Se ponen en cero una vez
+            // al entrar; despues se pueden seguir tocando en vivo desde la
+            // consola sin que el mod las vuelva a pisar.
+            static bool s_viewmodelCvarsReset = false;
+            if (!s_viewmodelCvarsReset)
+            {
+                s_viewmodelCvarsReset = true;
+                m_Game->Ec_ClientCmdUnrestricted("viewmodel_offset_x 0");
+                m_Game->Ec_ClientCmdUnrestricted("viewmodel_offset_y 0");
+                m_Game->Ec_ClientCmdUnrestricted("viewmodel_offset_z 0");
+                Game::LogInit("viewmodel_offset_* reseteadas a 0 (la calibracion va por perfil)", nullptr);
+            }
         }
         s_wasInGame = inGame;
 
