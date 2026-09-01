@@ -42,6 +42,7 @@ Hooks::Hooks(Game *game)
 	hkCWeaponPortalgun_FirePortal.enableHook();
 
 	hkDrawSelf.enableHook();
+	hkDrawSelfNoZ.enableHook();
 	hkPlayerPortalled.enableHook();
 	hkMsgEntityPortalled.enableHook();
 	hkSurfaceGetScreenSize.enableHook();
@@ -139,7 +140,10 @@ int Hooks::initSourceHooks()
 	hkCWeaponPortalgun_FirePortal.createHook((LPVOID)m_Game->m_Offsets->CWeaponPortalgun_FirePortal.address, &dCWeaponPortalgun_FirePortal);
 
 	LPVOID DrawSelfAddr = (LPVOID)(m_Game->m_Offsets->DrawSelf.address);
-	hkDrawSelf.createHook(DrawSelfAddr, &dDrawSelf);
+	if (m_Game->Abi().drawSelfHasApparentZ)
+		hkDrawSelf.createHook(DrawSelfAddr, &dDrawSelf);
+	else
+		hkDrawSelfNoZ.createHook(DrawSelfAddr, &dDrawSelfNoZ);
 	
 	LPVOID ClipTransformAddr = (LPVOID)(m_Game->m_Offsets->ClipTransform.address);
 	hkClipTransform.createHook(ClipTransformAddr, &dClipTransform);
@@ -1048,30 +1052,45 @@ int __fastcall Hooks::dDrawSelf(void* ecx, void* edx, int x, int y, int w, int h
 
 	//auto viewport = m_Game->m_ClientMode->GetViewport();
 
-	int newX = x;
-	int	newY = y;
-
-	if (m_VR->m_IsVREnabled)
-	{
-		int windowWidth, windowHeight;
-		m_Game->GetGameWindowSize(windowWidth, windowHeight);
-
-		Vector screen = { 0, 0, 0 };
-
-		//Vector vec = m_VR->m_AimPos - m_VR->GetRightControllerAbsPos();
-
-		//newZ = 1.0 / sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
-
-		ScreenTransform(m_VR->m_AimPos, &screen, m_VR->m_RenderWidth, m_VR->m_RenderHeight);
-
-		int offsetX = x - (windowWidth * 0.5f);
-		int offsetY = y - (windowHeight * 0.5f);
-
-		newX = screen.x + offsetX;
-		newY = screen.y + offsetY;
-	}
+	int newX = x, newY = y;
+	AimScreenPos(x, y, newX, newY);
 
 	return hkDrawSelf.fOriginal(ecx, newX, newY, w, h, clr, flApparentZ);
+}
+
+// Igual que dDrawSelf pero para builds cuyo CHudTexture::DrawSelf no lleva
+// flApparentZ (ese parametro se agrego despues de corehub).
+int __fastcall Hooks::dDrawSelfNoZ(void* ecx, void* edx, int x, int y, int w, int h, const void* clr)
+{
+	int newX = x, newY = y;
+	AimScreenPos(x, y, newX, newY);
+
+	return hkDrawSelfNoZ.fOriginal(ecx, newX, newY, w, h, clr);
+}
+
+// Mueve la mira desde el centro de la pantalla al punto al que apunta el
+// control, proyectando m_AimPos a coordenadas de pantalla.
+//
+// m_AimPos ya se calcula todos los frames, sin depender del AimMode. Lo que no
+// se puede dar por sentado es ClipTransform: si su offset no esta portado,
+// fOriginal queda en null y proyectar reventaria. Sin el, la mira se deja donde
+// estaba en vez de perder el HUD entero.
+bool Hooks::AimScreenPos(int x, int y, int &newX, int &newY)
+{
+	if (!m_VR->m_IsVREnabled || !hkClipTransform.fOriginal)
+		return false;
+
+	int windowWidth, windowHeight;
+	m_Game->GetGameWindowSize(windowWidth, windowHeight);
+
+	Vector screen = { 0, 0, 0 };
+	ScreenTransform(m_VR->m_AimPos, &screen, m_VR->m_RenderWidth, m_VR->m_RenderHeight);
+
+	// x/y vienen centrados por VGUI; se conserva ese corrimiento para no perder
+	// el centrado del icono respecto de su propio tamano.
+	newX = (int)screen.x + (x - (int)(windowWidth * 0.5f));
+	newY = (int)screen.y + (y - (int)(windowHeight * 0.5f));
+	return true;
 }
 
 void __cdecl Hooks::dVGui_GetHudBounds(int slot, int& x, int& y, int& w, int& h) {

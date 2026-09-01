@@ -123,6 +123,8 @@ typedef void(__cdecl* tMsgEntityPortalled)(void* msg);
 
 typedef int(__thiscall* tGetModeHeight)(void* thisptr);
 typedef int(__thiscall* tDrawSelf)(void* thisptr, int x, int y, int w, int h, const void* clr, float flApparentZ);
+// corehub no tiene flApparentZ: ese parametro se agrego despues. Ver AbiLayout::drawSelfHasApparentZ.
+typedef int(__thiscall* tDrawSelfNoZ)(void* thisptr, int x, int y, int w, int h, const void* clr);
 typedef bool(__cdecl* tClipTransform)(const Vector& point, Vector* pClip);
 typedef void(__cdecl* tVGui_GetHudBounds)(int slot, int& x, int& y, int& w, int& h);
 typedef void(__cdecl* tVGui_GetPanelBounds)(int slot, int& x, int& y, int& w, int& h);
@@ -206,6 +208,7 @@ public:
 
 	static inline Hook<tGetModeHeight> hkGetModeHeight;
 	static inline Hook<tDrawSelf> hkDrawSelf;
+	static inline Hook<tDrawSelfNoZ> hkDrawSelfNoZ;
 	static inline Hook<tClipTransform> hkClipTransform;
 	static inline Hook<tPlayerPortalled> hkPlayerPortalled;
 	static inline Hook<tMsgEntityPortalled> hkMsgEntityPortalled;
@@ -293,6 +296,10 @@ public:
 	// Crosshair
 	static int __fastcall dGetModeHeight(void* ecx, void* edx);
 	static int __fastcall dDrawSelf(void* ecx, void* edx, int x, int y, int w, int h, const void* clr, float flApparentZ);
+	static int __fastcall dDrawSelfNoZ(void* ecx, void* edx, int x, int y, int w, int h, const void* clr);
+	// Calcula la posicion en pantalla del punto al que apunta el control.
+	// Devuelve false si no se pudo (sin ClipTransform no hay proyeccion).
+	static bool AimScreenPos(int x, int y, int &newX, int &newY);
 	static bool dClipTransform(const Vector& point, Vector* pScreen);
 	static void __fastcall dSetBounds(void* ecx, void* edx, int x, int y, int w, int h);
 	static void __fastcall dSetSize(void* ecx, void* edx, int wide, int tall);

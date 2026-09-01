@@ -1273,7 +1273,14 @@ void VR::UpdateTracking()
     QAngle::VectorAngles(m_RightControllerForward, m_RightControllerUp, m_RightControllerAngAbs);
     m_RightControllerAngAbs.Normalize();
 
+    // La calibracion base es por build: el portalgun no tiene el mismo origen de
+    // modelo que las armas de L4D2, de donde salio el valor de upstream.
     PositionAngle viewmodelOffset = PositionAngle{ {4.5, -1, 1.5}, {0,0,0} };
+    if (m_Game->m_Offsets && m_Game->m_Offsets->profile)
+    {
+        const AbiLayout &abi = m_Game->m_Offsets->profile->abi;
+        viewmodelOffset.position = { abi.viewmodelOffsetX, abi.viewmodelOffsetY, abi.viewmodelOffsetZ };
+    }
 
     // Apply both hardcoded and custom (from config) viewmodel offsets here:
     m_ViewmodelPosOffset = viewmodelOffset.position + m_ViewmodelPosCustomOffset;

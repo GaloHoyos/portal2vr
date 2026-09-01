@@ -123,8 +123,8 @@ static const OffsetDef kBuild852_0[] = {
     { "VGui_Paint", "engine.dll", 0, "", 0 },  // TODO Fase E
     { "PlayerPortalled", "client.dll", 0, "", 0 },  // TODO Fase E
     { "MsgFunc_EntityPortalled", "client.dll", 0x1D4BD0, "81 EC ? ? ? ? 53 55 56 8B B4 24 ? ? ? ? 8B 4E 14 33 DB 83 F9 20", 0 },  // handler del user message, ubicado por HookMessage("EntityPortalled", handler)
-    { "DrawSelf", "client.dll", 0, "", 0 },  // TODO Fase E
-    { "ClipTransform", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "DrawSelf", "client.dll", 0xD60C0, "56 8B F1 80 BE 80 00 00 00 00 74 ? 8B 0D ? ? ? ? 8B 01 8B 96 84 00 00 00 8B 40 50", 0 },  // CHudTexture::DrawSelf(x,y,w,h,clr): ret 0x14, sin flApparentZ. Lo llama el overload de 3 args desde CHudCrosshair::Paint
+    { "ClipTransform", "client.dll", 0x16D550, "8B 0D ? ? ? ? 8B 01 8B 90 94 00 00 00 FF D2 8B 4C 24 04 F3 0F 10 40 08 F3 0F 59 41 08", 0 },  // engine->WorldToScreenMatrix() en el slot 0x94, transform 4x4 y divide por w
     { "VGui_GetClientDLLRootPanel", "client.dll", 0, "", 0 },  // TODO Fase E
     { "g_pFullscreenRootPanel", "client.dll", 0, "", 2 },  // TODO Fase E
     { "CreatePingPointer", "client.dll", 0, "", 0 },  // TODO Fase E
@@ -322,6 +322,16 @@ static constexpr AbiLayout AbiBuild852_0()
     // El offset apunta a C_BaseViewModel::CalcViewModelView, no a la del
     // jugador: en corehub esa no quedo como funcion separada.
     a.calcViewModelViewTakesOwner = true;
+
+    // Su DrawSelf termina en "ret 0x14": 5 params + this, sin flApparentZ.
+    a.drawSelfHasApparentZ = false;
+
+    // Calibrado con el visor puesto: equivale a viewmodel_offset_x/y/z en
+    // -9/-9/9 sobre el default de upstream. Va con el signo invertido porque
+    // esas ConVars suman y este offset se resta.
+    a.viewmodelOffsetX = 13.5f;
+    a.viewmodelOffsetY = 8.0f;
+    a.viewmodelOffsetZ = -7.5f;
 
     // Retail los tiene en 114/133/139, y la vtable de corehub tiene ~90 slots:
     // el override de tamano de pantalla no existe en este build. Los tres se

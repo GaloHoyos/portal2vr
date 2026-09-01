@@ -128,6 +128,22 @@ struct AbiLayout
     // de una partida: en el menu no se nota. false = AimMode se fuerza a 0.
     bool laserAimSupported = true;
 
+    // Calibracion del viewmodel, en unidades de Source sobre los ejes del
+    // control (adelante, derecha, arriba). Se RESTA de la posicion del control,
+    // asi que subir un valor aleja el modelo en sentido contrario a ese eje.
+    //
+    // El default es el de upstream, que viene del mod original de Left 4 Dead 2
+    // y nunca se recalibro para el portalgun: por eso el arma se ve despegada
+    // de la mano hasta que se ajusta.
+    float viewmodelOffsetX = 4.5f;
+    float viewmodelOffsetY = -1.0f;
+    float viewmodelOffsetZ = 1.5f;
+
+    // CHudTexture::DrawSelf lleva flApparentZ? En corehub no: ese parametro se
+    // agrego despues, y su DrawSelf termina en "ret 0x14" (5 params + this)
+    // contra los 6 de retail. Cambia la firma del detour, no lo que hace.
+    bool drawSelfHasApparentZ = true;
+
     // De que clase es el CalcViewModelView al que apunta el offset.
     //
     // Retail engancha C_BasePlayer::CalcViewModelView(pos, ang), que recorre
