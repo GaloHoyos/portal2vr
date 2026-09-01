@@ -191,6 +191,25 @@ int Hooks::initSourceHooks()
 	return 1;
 } 
 
+int Hooks::SafeEntityIndex(void *entity)
+{
+	if (!EntityIndex || !entity)
+		return -1;
+	return EntityIndex(entity);
+}
+
+void *Hooks::SafeGetOwner(void *weapon)
+{
+	if (!GetOwner || !weapon)
+		return nullptr;
+	return GetOwner(weapon);
+}
+
+bool Hooks::IsValidPlayerIndex(int index)
+{
+	return index >= 0 && index < (int)m_Game->m_PlayersVRInfo.size();
+}
+
 bool __fastcall Hooks::dCHudCrosshair_ShouldDraw(void* ecx, void* edx) {
 	bool shouldDraw = hkCHudCrosshair_ShouldDraw.fOriginal(ecx);
 
@@ -201,7 +220,12 @@ bool __fastcall Hooks::dCHudCrosshair_ShouldDraw(void* ecx, void* edx) {
 
 void __fastcall Hooks::dPrecache(void* ecx, void* edx) {
 	hkPrecache.fOriginal(ecx);
-	PrecacheParticleSystem("robot_point_beam");
+
+	// robot_point_beam es el efecto del ping de cooperativo, agregado despues de
+	// las builds de desarrollo: en corehub no existe. Precachearlo ahi no aporta
+	// nada y hace ruido, asi que solo se pide donde el laser esta soportado.
+	if (PrecacheParticleSystem && m_Game->m_Offsets->profile->abi.laserAimSupported)
+		PrecacheParticleSystem("robot_point_beam");
 }
 
 void __fastcall Hooks::dClientThink(void* ecx, void* edx) {
@@ -616,7 +640,7 @@ float __fastcall Hooks::dProcessUsercmds(void *ecx, void *edx, edict_t *player, 
 {
 	Server_BaseEntity *pPlayer = (Server_BaseEntity*)player->m_pUnk->GetBaseEntity();
 
-	int index = EntityIndex(pPlayer);
+	int index = SafeEntityIndex(pPlayer);
 	m_Game->m_CurrentUsercmdID = index;
 
 	return hkProcessUsercmds.fOriginal(ecx, player, buf, numcmds, totalcmds, dropped_packets, ignore, paused);
@@ -818,12 +842,15 @@ Vector* Hooks::dWeapon_ShootPosition(void* ecx, void* edx, Vector* eyePos)
 	Vector* result = hkWeapon_ShootPosition.fOriginal(ecx, eyePos);
 
 	int localIndex = m_Game->Ec_GetLocalPlayer();
-	int index = EntityIndex(ecx);
+	int index = SafeEntityIndex(ecx);
+
+	if (!IsValidPlayerIndex(index))
+		return result;
 
 	auto vrPlayer = m_Game->m_PlayersVRInfo[index];
 
 	if (m_VR->m_IsVREnabled && localIndex == index) {
-		*result = m_VR->GetRightControllerAbsPos();	
+		*result = m_VR->GetRightControllerAbsPos();
 	}
 	else if (vrPlayer.isUsingVR)
 	{
@@ -854,11 +881,11 @@ bool __fastcall Hooks::dTraceFirePortal(void* ecx, void* edx, const Vector& vTra
 	if (iPlacedBy == 2) {
 		int localIndex = m_Game->Ec_GetLocalPlayer();
 
-		auto owner = GetOwner(ecx);
+		auto owner = SafeGetOwner(ecx);
+		int index = SafeEntityIndex(owner);
 
-		if (owner) {
-			int index = EntityIndex(owner);
-
+		// Sin owner o sin indice valido se pasa el trace original sin tocar.
+		if (owner && IsValidPlayerIndex(index)) {
 			auto vrPlayer = m_Game->m_PlayersVRInfo[index];
 
 			if (m_VR->m_IsVREnabled && localIndex == index) {
@@ -1154,7 +1181,10 @@ void __fastcall Hooks::dRotateObject(void* ecx, void* edx, void* pPlayer, float 
 QAngle& __fastcall Hooks::dEyeAngles(void* ecx, void* edx) {
 	if (m_VR->m_OverrideEyeAngles) {
 		int localIndex = m_Game->Ec_GetLocalPlayer();
-		int index = EntityIndex(ecx);
+		int index = SafeEntityIndex(ecx);
+
+		if (!IsValidPlayerIndex(index))
+			return hkEyeAngles.fOriginal(ecx);
 
 		auto& vrPlayer = m_Game->m_PlayersVRInfo[index];
 

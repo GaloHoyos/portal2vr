@@ -114,12 +114,12 @@ static const OffsetDef kBuild852_0[] = {
     { "PrePushRenderTarget", "client.dll", 0, "", 0 },  // TODO Fase E
     { "ReadUserCmd", "server.dll", 0, "", 0 },  // TODO Fase E
     { "ProcessUsercmds", "server.dll", 0, "", 0 },  // TODO Fase E
-    { "CBaseEntity_entindex", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "CBaseEntity_entindex", "server.dll", 0x1A150, "8B 41 1C 85 C0 75 01 C3 8B 0D ? ? ? ? 2B 41 58 C1 F8 04 C3 CC", 0 },  // la firma de retail sirve sin cambios
     { "EyePosition", "server.dll", 0, "", 0 },  // TODO Fase E
     { "PushRenderTargetAndViewport", "materialsystem.dll", 0x27DF0, "83 EC 24 8B 44 24 ? 8B 54 24 ? 89 04 24 33 C0 56 8B F1", 0 },  // CMatRenderContext[104], el overload de 6 args
     { "PopRenderTargetAndViewport", "materialsystem.dll", 0x276F0, "56 8B F1 83 7E 50 00 74 ? 8B 06 8B 50 10", 0 },  // CMatRenderContext[108]; retail usa +0x4C, aca +0x50
-    { "TraceFirePortalServer", "server.dll", 0, "", 0 },  // TODO Fase E
-    { "CWeaponPortalgun_FirePortal", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "TraceFirePortalServer", "server.dll", 0x3269F0, "55 8B EC 83 E4 F0 81 EC 24 07 00 00 53 56 57 8B F1 33 DB 53 56 8D 4C 24 ?", 0 },  // this+5 params (Vector*, Vector*, bool, int, trace*); unico llamado desde FirePortal
+    { "CWeaponPortalgun_FirePortal", "server.dll", 0x326EE0, "81 EC 18 01 00 00 53 55 56 57 8B E9 C6 44 24 12 00 E8 ? ? ? ? 8B D8 85 DB", 0 },  // this+2 params (bool, Vector*); unico llamador de TraceFirePortal
     { "VGui_Paint", "engine.dll", 0, "", 0 },  // TODO Fase E
     { "PlayerPortalled", "client.dll", 0, "", 0 },  // TODO Fase E
     { "MsgFunc_EntityPortalled", "client.dll", 0x1D4BD0, "81 EC ? ? ? ? 53 55 56 8B B4 24 ? ? ? ? 8B 4E 14 33 DB 83 F9 20", 0 },  // handler del user message, ubicado por HookMessage("EntityPortalled", handler)
@@ -129,8 +129,8 @@ static const OffsetDef kBuild852_0[] = {
     { "g_pFullscreenRootPanel", "client.dll", 0, "", 2 },  // TODO Fase E
     { "CreatePingPointer", "client.dll", 0, "", 0 },  // TODO Fase E
     { "GetPortalPlayer", "client.dll", 0, "", 0 },  // TODO Fase E
-    { "PrecacheParticleSystem", "server.dll", 0, "", 0 },  // TODO Fase E
-    { "Precache", "server.dll", 0, "", 0 },  // TODO Fase E
+    { "PrecacheParticleSystem", "server.dll", 0x13DEE0, "8B 0D ? ? ? ? 8B 54 24 04 8B 01 8B 40 20 6A 00 6A FF 52 6A 01 FF D0 C3", 0 },  // 3 vecinas identicas salvo el global; el hint desambigua (no se puede fijar la direccion: el loader la reubica)
+    { "Precache", "server.dll", 0x327D70, "E8 ? ? ? ? 68 ? ? ? ? E8 ? ? ? ? 68 ? ? ? ? E8 ? ? ? ? 68 ? ? ? ? E8 ? ? ? ? 68 ? ? ? ? E8", 0 },  // CWeaponPortalgun::Precache: cadena de push/call de precacheo
     { "SetControlPoint", "client.dll", 0, "", 0 },  // TODO Fase E
     { "SetDrawOnlyForSplitScreenUser", "client.dll", 0, "", 0 },  // TODO Fase E
     { "StopEmission", "client.dll", 0, "", 0 },  // TODO Fase E
@@ -147,7 +147,7 @@ static const OffsetDef kBuild852_0[] = {
     { "MatrixBuildPerspectiveX", "engine.dll", 0, "", 0 },  // TODO Fase E
     { "GetFOV", "client.dll", 0, "", 0 },  // TODO Fase E
     { "GetDefaultFOV", "client.dll", 0, "", 0 },  // TODO Fase E
-    { "GetViewModelFOV", "client.dll", 0, "", 0 },  // TODO Fase E
+    { "GetViewModelFOV", "client.dll", 0x964C0, "A1 ? ? ? ? D9 40 2C C3", 0 },  // lee viewmodel_fov+0x1C (m_pParent); unico lector en el modulo
     { "GetOwner", "server.dll", 0, "", 0 },  // TODO Fase E
 };
 

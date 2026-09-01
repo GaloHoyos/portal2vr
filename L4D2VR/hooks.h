@@ -337,4 +337,15 @@ public:
 	static inline tEntindex EntityIndex;
 	static inline tGetOwner GetOwner;
 	static inline tGetFullScreenTexture GetFullScreenTexture;
+
+	// Los punteros de arriba salen de offsets que pueden no estar portados para
+	// la build activa, y entonces quedan null. Los hooks que los usan si pueden
+	// estar activos (su propio offset resolvio), asi que llamarlos directo
+	// crashea. Estos wrappers degradan en vez de reventar.
+	static int SafeEntityIndex(void *entity);
+	static void *SafeGetOwner(void *weapon);
+
+	// EntityIndex devuelve indices de entidad, que en Source llegan a 2048;
+	// m_PlayersVRInfo tiene 24 entradas. Indexar sin acotar corrompe memoria.
+	static bool IsValidPlayerIndex(int index);
 };
