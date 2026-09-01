@@ -134,6 +134,11 @@ typedef void(__cdecl* tGetHudSize)(int& w, int& h);
 typedef void(__thiscall* tSetBounds)(void* thisptr, int x, int y, int w, int h);
 typedef void(__thiscall* tSetSize)(void* thisptr, int wide, int tall);
 typedef void(__thiscall* tGetScreenSize)(void* thisptr, int& wide, int& tall);
+
+// ISurface::GetScreenSize. VGUI maqueta el HUD (en Portal 2, la mira) con lo que
+// devuelve esto, no con el CViewSetup. Se engancha por la direccion sacada de la
+// vtable en runtime con el indice del perfil: no hace falta derivar un offset.
+typedef void(__thiscall* tSurfaceGetScreenSize)(void* thisptr, int& wide, int& tall);
 typedef void(__thiscall* tPush2DView)(void* thisptr, IMatRenderContext* pRenderContext, const CViewSetup& view, int nFlags, ITexture* pRenderTarget, void* frustumPlanes);
 typedef void(__thiscall* tRender)(void* thisptr, vrect_t* rect);
 typedef void(__thiscall* tGetClipRect)(void* thisptr, int& x0, int& y0, int& x1, int& y1);
@@ -201,6 +206,7 @@ public:
 	static inline Hook<tClipTransform> hkClipTransform;
 	static inline Hook<tPlayerPortalled> hkPlayerPortalled;
 	static inline Hook<tMsgEntityPortalled> hkMsgEntityPortalled;
+	static inline Hook<tSurfaceGetScreenSize> hkSurfaceGetScreenSize;
 	static inline Hook<tVGui_GetHudBounds> hkVGui_GetHudBounds;
 	static inline Hook<tVGui_GetPanelBounds> hkVGui_GetPanelBounds;
 
@@ -278,6 +284,7 @@ public:
 	// Portalling angle fix
 	static void __fastcall dPlayerPortalled(void* ecx, void* edx, void* a2, __int64 a3);
 	static void __cdecl dMsgEntityPortalled(void* msg);
+	static void __fastcall dSurfaceGetScreenSize(void* ecx, void* edx, int& wide, int& tall);
 
 	// Crosshair
 	static int __fastcall dGetModeHeight(void* ecx, void* edx);

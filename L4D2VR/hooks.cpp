@@ -43,6 +43,7 @@ Hooks::Hooks(Game *game)
 	hkDrawSelf.enableHook();
 	hkPlayerPortalled.enableHook();
 	hkMsgEntityPortalled.enableHook();
+	hkSurfaceGetScreenSize.enableHook();
 
 	//hkComputeError.enableHook();
 	hkUpdateObject.enableHook();
@@ -138,6 +139,18 @@ int Hooks::initSourceHooks()
 	
 	LPVOID ClipTransformAddr = (LPVOID)(m_Game->m_Offsets->ClipTransform.address);
 	hkClipTransform.createHook(ClipTransformAddr, &dClipTransform);
+
+	// ISurface::GetScreenSize, enganchado por la direccion sacada de la vtable
+	// viva con el indice del perfil, que ya esta verificado. Mas robusto que
+	// derivar una firma de bytes mas, y no gasta una entrada de offsets.
+	{
+		const int idx = m_Game->Abi().sfGetScreenSize;
+		if (m_Game->m_VguiSurface && idx >= 0)
+		{
+			LPVOID addr = (LPVOID)(*(void ***)m_Game->m_VguiSurface)[idx];
+			hkSurfaceGetScreenSize.createHook(addr, &dSurfaceGetScreenSize);
+		}
+	}
 
 	// Portalling
 	LPVOID PlayerPortalledAddr = (LPVOID)(m_Game->m_Offsets->PlayerPortalled.address);
@@ -898,6 +911,41 @@ void __fastcall Hooks::dPlayerPortalled(void* ecx, void* edx, void* a2, __int64 
 // Sin esto, al cruzar un portal que te reorienta la camara se queda mirando
 // hacia donde mirabas antes: el mod pisa los angulos con los del visor en cada
 // frame, asi que la rotacion del engine se pierde si nadie la captura.
+// VGUI maqueta el HUD -- en Portal 2 basicamente la mira -- con el tamano que
+// devuelve esto. Si reporta el de la ventana mientras se dibuja sobre la textura
+// del ojo, la mira queda arriba y a un costado: con ventana 2560x1600 sobre una
+// textura de 2584x2820 cae en v=0.284, cuando el centro del rango visible del
+// ojo (0.16 a 1.00) esta en v=0.58.
+//
+// Agrandar la ventana no alcanza: haria falta una de 3272 px de alto, y ademas
+// Windows la recorta al tamano del monitor. Y la via de upstream
+// (ForceScreenSizeOverride) no esta: ese metodo no aparece en la vtable de este
+// build, y encima su call site esta comentado incluso en el mod original.
+//
+// Asi que se miente siempre, no solo durante el render de los ojos. Medido:
+// VGUI consulta esto unas 60 veces por segundo, pero casi nunca dentro del
+// render, asi que restringirlo a ese momento no cambiaba nada.
+//
+// P2VR_NOHUDSCALE=1 lo desactiva, para comparar.
+void __fastcall Hooks::dSurfaceGetScreenSize(void* ecx, void* edx, int& wide, int& tall)
+{
+	static int disabled = -1;
+	if (disabled < 0)
+	{
+		char v[8]; size_t n = 0;
+		disabled = (getenv_s(&n, v, sizeof(v), "P2VR_NOHUDSCALE") == 0 && n > 1) ? 1 : 0;
+	}
+
+	if (!disabled && m_VR->m_IsVREnabled && m_VR->m_CreatedVRTextures)
+	{
+		wide = m_VR->m_RenderWidth;
+		tall = m_VR->m_RenderHeight;
+		return;
+	}
+
+	hkSurfaceGetScreenSize.fOriginal(ecx, wide, tall);
+}
+
 void __cdecl Hooks::dMsgEntityPortalled(void* msg)
 {
 	QAngle before;
